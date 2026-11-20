@@ -1,21 +1,21 @@
 {
- "판": "R0.1.41",
- "만든때": "2026-11-20T19:47:06.548Z",
+ "판": "R0.1.42",
+ "만든때": "2026-11-20T19:56:04.569Z",
  "파일": [
   {
    "경로": "게임/js/char_editor.js",
-   "sha256": "d40eb0b797dbab1809cd2945ee8beddebc8ac4bbbde782db13a53d278bdf7e86",
-   "크기": 57984
+   "sha256": "118ae923edbe4fc3cf40bf7a5c064519f973ff62bfcd69a370a1ee164ee52e6b",
+   "크기": 58017
   },
   {
    "경로": "게임/js/screens.js",
-   "sha256": "6bb466d0191edaf7fdceb1b593cb40b90318a4fed453f42b55341ebd0dbb595c",
+   "sha256": "9fcf56560921aae68b68c4d5edf2cb8e364ba03819032e4c7bb2c12998bbf89c",
    "크기": 1044521
   },
   {
    "경로": "게임/릴리즈노트.txt",
-   "sha256": "725cd4b69328137f0db9004710e75debab3eeabbad233a1228ed214b9691ab4d",
-   "크기": 16953
+   "sha256": "be901ad1bcca2992051ed8390fe3c9bfcf7bd2c5af922148c3a284ea9fff0709",
+   "크기": 16988
   }
  ],
  "엔진": [
