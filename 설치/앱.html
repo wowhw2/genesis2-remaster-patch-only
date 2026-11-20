@@ -12,19 +12,40 @@
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; user-select: none; }
   #판 { position: absolute; image-rendering: pixelated; }
-  #첫, #창1첫 { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  #첫, #창1첫, #폴더CD첫 { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
         color: #f0e0a0; font: 18px "Malgun Gothic", sans-serif; text-align: center; }
-  #첫 h1, #창1첫 h1 { font-size: 30px; margin: 0 0 10px; letter-spacing: 2px; }
-  #첫 .설명, #창1첫 .설명 { color: #b8a878; font-size: 15px; line-height: 1.6; }
-  #첫 button, #창1첫 button { font: 17px "Malgun Gothic", sans-serif; color: #f8e890; background: #4a5e4a; border: 2px solid #1c1c1c;
+  #첫 h1, #창1첫 h1, #폴더CD첫 h1 { font-size: 30px; margin: 0 0 10px; letter-spacing: 2px; }
+  #첫 .설명, #창1첫 .설명, #폴더CD첫 .설명 { color: #b8a878; font-size: 15px; line-height: 1.6; }
+  #첫 button, #창1첫 button, #폴더CD첫 button { font: 17px "Malgun Gothic", sans-serif; color: #f8e890; background: #4a5e4a; border: 2px solid #1c1c1c;
                padding: 10px 26px; min-width: 260px; cursor: pointer; }
-  #첫 button:hover, #창1첫 button:hover { background: #5c745c; }
-  #첫 .오류, #창1첫 .오류 { color: #ff8a70; min-height: 22px; font-size: 15px; }
+  #첫 button:hover, #창1첫 button:hover, #폴더CD첫 button:hover { background: #5c745c; }
+  #첫 .오류, #창1첫 .오류, #폴더CD첫 .오류 { color: #ff8a70; min-height: 22px; font-size: 15px; }
   /* 정본 273 — 릴리즈노트 상자 (스크롤) */
   .노트 { width: min(860px, 90vw); height: 34vh; overflow-y: auto; text-align: left; white-space: pre-wrap; box-sizing: border-box;
           padding: 12px 16px; background: rgba(20, 24, 20, 0.85); border: 2px solid #3a4a3a; color: #d8ccb0; font: 14px/1.55 "Malgun Gothic", sans-serif; }
   .노트:empty { display: none; }
-  /* 정본 310 — 이미 설치돼 있을 때 첫 화면(«바로 시작» / «다시 설치») */
+  /* 정본 351 — 설치된 폴더 + CD(이미지·드라이브) · «CD 없이 계속» 은 폴더에 CD 내용까지 복사해 둔 경우 */
+function 폴더CD화면(d) {
+  document.getElementById('첫').style.display = 'none'; document.getElementById('폴더CD첫').style.display = '';
+  var 오류 = document.getElementById('폴더CD오류'); 오류.textContent = '';
+  var 잇기 = function (cd) {
+    오류.textContent = '확인하는 중…';
+    return 창구.폴더로(cd ? { 폴더: d, cd: cd } : { 폴더: d }).then(function () {
+      오류.textContent = ''; document.getElementById('폴더CD첫').style.display = 'none'; 창1화면();   /* 창1 원본은 꼭 — 폴더 길도 묻는다 */
+    });
+  };
+  var 고르고 = function (종류) {
+    오류.textContent = '';
+    창구.고르기(종류).then(function (cd) { if (cd) return 잇기(cd); })
+      .catch(function (e) { 오류.textContent = String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''); });
+  };
+  document.getElementById('폴더CD고르기').onclick = function () { 고르고('CD'); };
+  document.getElementById('폴더드라이브고르기').onclick = function () { 고르고('CD폴더'); };
+  document.getElementById('폴더CD없이').onclick = function () {
+    잇기(null).catch(function (e) { 오류.textContent = String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''); });
+  };
+}
+/* 정본 310 — 이미 설치돼 있을 때 첫 화면(«바로 시작» / «다시 설치») */
   #설치됨 { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
             color: #f0e0a0; font: 18px "Malgun Gothic", sans-serif; text-align: center; }
   #설치됨 h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: 2px; }
@@ -54,6 +75,16 @@
   <button id="폴더고르기">설치된 폴더 고르기</button>
   <div class="오류" id="첫오류"></div>
   <div class="노트" id="첫노트"></div>
+</div>
+<!-- 정본 351 — «설치된 폴더 고르기» 뒤 CD 도: 월드 지도(CHAPDATA/CHAPTER.1~18)·전투 맵·연출(SCENARIO 256개)은 원본 CD 에만 있다.
+     폴더만 고르면 «월드맵 배경을 못 읽었다 (CHAPTER.9)» (신고 버그신고_20261121_002337 · DGGL 묶음판) · 앱 main.js 폴더로 는 cd 를 이미 받는다 -->
+<div id="폴더CD첫" style="display:none">
+  <h1>창세기전 2 CD 도 골라 주세요</h1>
+  <div class="설명">월드 지도와 전투 맵 일부는 설치 폴더가 아니라 <b>원본 CD 에만</b> 있습니다.<br>창세기전 2 CD 이미지(.cue · .bin · .iso) 또는 CD 를 꽂은 드라이브를 골라 주세요.<br>설치 폴더에 CD 내용(CHAPDATA 의 CHAPTER 파일)까지 복사해 두었다면 «CD 없이 계속»을 누르세요.</div>
+  <button id="폴더CD고르기">CD 이미지 고르기</button>
+  <button id="폴더드라이브고르기">CD 드라이브 고르기</button>
+  <button id="폴더CD없이">CD 없이 계속</button>
+  <div class="오류" id="폴더CD오류"></div>
 </div>
 <!-- 창세기전 1 원본 — 꼭 필요하다 (사장님 11-09 「창1도 반드시 필요해. 용자의무덤, HGS 및 각종 스프라이트 등을 창1없이 하려면 각각 대체할 수 있는게 필요해서 어려워.」) -->
 <div id="창1첫" style="display:none">
@@ -233,10 +264,30 @@ document.getElementById('폴더고르기').onclick = function () {
   var 오류 = document.getElementById('첫오류'); 오류.textContent = '';
   창구.고르기('폴더').then(function (d) {
     if (!d) return;
-    오류.textContent = '확인하는 중…';
-    return 창구.폴더로({ 폴더: d }).then(function () { 오류.textContent = ''; 창1화면(); });   /* 창1 원본은 꼭 — 폴더 길도 묻는다 */
+    오류.textContent = ''; 폴더CD화면(d);   /* 정본 351 — CD 도 고른다(CD 에만 있는 월드 지도·전투 맵) */   /* 창1 원본은 꼭 — 폴더 길도 묻는다 */
   }).catch(function (e) { 오류.textContent = String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''); });
 };
+/* 정본 351 — 설치된 폴더 + CD(이미지·드라이브) · «CD 없이 계속» 은 폴더에 CD 내용까지 복사해 둔 경우 */
+function 폴더CD화면(d) {
+  document.getElementById('첫').style.display = 'none'; document.getElementById('폴더CD첫').style.display = '';
+  var 오류 = document.getElementById('폴더CD오류'); 오류.textContent = '';
+  var 잇기 = function (cd) {
+    오류.textContent = '확인하는 중…';
+    return 창구.폴더로(cd ? { 폴더: d, cd: cd } : { 폴더: d }).then(function () {
+      오류.textContent = ''; document.getElementById('폴더CD첫').style.display = 'none'; 창1화면();   /* 창1 원본은 꼭 — 폴더 길도 묻는다 */
+    });
+  };
+  var 고르고 = function (종류) {
+    오류.textContent = '';
+    창구.고르기(종류).then(function (cd) { if (cd) return 잇기(cd); })
+      .catch(function (e) { 오류.textContent = String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''); });
+  };
+  document.getElementById('폴더CD고르기').onclick = function () { 고르고('CD'); };
+  document.getElementById('폴더드라이브고르기').onclick = function () { 고르고('CD폴더'); };
+  document.getElementById('폴더CD없이').onclick = function () {
+    잇기(null).catch(function (e) { 오류.textContent = String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''); });
+  };
+}
 /* 정본 310 — 이미 설치돼 있을 때 첫 화면: «바로 시작»(지금처럼 게임으로) / «다시 설치»(확인 → 설치기록·GENESIS2·파생만 지우고 원본 고르기 첫 화면으로) */
 function 설치됨화면() {
   판.style.display = 'none'; document.getElementById('첫').style.display = 'none'; document.getElementById('창1첫').style.display = 'none';
