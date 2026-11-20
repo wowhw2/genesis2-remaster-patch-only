@@ -95,6 +95,8 @@
     o.모바일 = 모바일;
     o.메모리MB = 해(function () { return performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) + ' / ' + Math.round(performance.memory.jsHeapSizeLimit / 1048576) : null; });
     o.리마스터판 = 해(function () { return root.G2리마스터판 || (typeof document !== 'undefined' && document.title) || ''; });
+    /* 정본 343 — 아이폰 «종료» 창구(앱 본체 R0.1.21 아이폰_시작.swift G2ExitGate)가 달렸나 · 신고 «판» 은 패치 판이라 본체가 새것인지 이것으로 가른다 */
+    o.종료창구 = 해(function () { return !!(root.webkit && root.webkit.messageHandlers && root.webkit.messageHandlers.g2exit); });
     return o;
   }
   /* 휴대폰(주소 «모바일=1»)은 앱 창구(G2앱)가 없다 — 신고를 zip 으로 묶어 같은 받는 곳(구글 드라이브 Apps Script · 앱/신고설정.json 과 같은 주소)으로 곧바로 보낸다 */
