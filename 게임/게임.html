@@ -5505,7 +5505,7 @@ window.G2_셸이몬다 = true;
               if (window.G2마을3D && G2마을3D.켬() ? !G2마을3D.화면안(ctx, (p.x | 0) + 12, (p.y | 0) + 16, 24) : (p.x < -24 + 보x0 || p.y < -32 + 보y0 || p.x > 보x1 || p.y > 보y1)) return;   /* [리마스터 ㉞] 보이는 논리 폭 · 3D 면 실제 3D 화면 안인지(배율대로 · 사장님 11-06 「상자가 … 일정 거리에 들어갔을때 그려지는데, 배율에 따라 달리보여야해」) */
               var 오 = 상자냐 ? G2TownBox.그림오프셋(fr)
                               : { x: fr.ax | 0, y: fr.ay | 0 };
-              var 캔 = G2Native.frameToCanvas(fr, 마._펼친팔);
+              var 캔 = G2Native.frameToCanvas캐시(fr, 마._펼친팔);
               if (상자냐) {
                 /* ★★★★★★★ **상자는 「24 × 16」으로 잘린다** — `PACK 0x2176D`~`0x2181F`
                  *   (2026-09-04 · 사용자 지적 「닫힌상자는 닫힌상자 **전체**에 커서가 가고」)
@@ -5917,11 +5917,11 @@ window.G2_셸이몬다 = true;
                   window.__그릴것.push({
                     발밑: (sp2.y | 0) + ((fr2.ay | 0) + (fr2.h | 0)),   /* 0x2280E */
                     발x: sp2.x | 0, 발y: (sp2.y | 0) + ((fr2.ay | 0) + (fr2.h | 0)), 크기: 마을인물가림크기(fr2, 팔2),   /* 리마스터 3D — 땅에 세울 발밑 점 */
-                    마을입체인물: window.__마을입체모드 == null ? null : { canvas: G2Native.frameToCanvas(fr2, 팔2),
+                    마을입체인물: window.__마을입체모드 == null ? null : { canvas: G2Native.frameToCanvas캐시(fr2, 팔2),
                       x: sp2.x + (fr2.ax | 0), y: sp2.y + (fr2.ay | 0),
                       w: fr2.w | 0, h: fr2.h | 0 },
                     그리기: function () {
-                      논리그리기(ctx,G2Native.frameToCanvas(fr2, 팔2),
+                      논리그리기(ctx,G2Native.frameToCanvas캐시(fr2, 팔2),
                                     sp2.x + (fr2.ax | 0), sp2.y + (fr2.ay | 0));
                     }
                   });
@@ -6080,10 +6080,10 @@ window.G2_셸이몬다 = true;
                     발밑: (자E.y | 0) + (프E.h | 0),          /* 0x2280E — 그림 아래끝 */
                     발x: (자E.x | 0) + ((프E.w | 0) >> 1), 발y: (자E.y | 0) + (프E.h | 0), 크기: { w: 프E.w | 0, h: 프E.h | 0, 가림없음: (프E.h | 0) <= 16 },   /* 정본 265 — 작은 소품은 깊이 가림도 안 받는다(참 깊이 가림 맵은 세워그리기 안에서 바로 가린다) */
                     소품: (프E.h | 0) <= 16,   /* 정본 265 — 술잔(bottle.nc2 5×10) 같은 작은 이벤트 그림 · 3D 에서 앞 탁자에 가려 안 보였다 → 가림 뒤에 그린다(원작 평면처럼 보이게) */
-                    마을입체인물: window.__마을입체모드 == null ? null : { canvas: G2Native.frameToCanvas(프E, 팔E),
+                    마을입체인물: window.__마을입체모드 == null ? null : { canvas: G2Native.frameToCanvas캐시(프E, 팔E),
                       x: 자E.x, y: 자E.y, w: 프E.w | 0, h: 프E.h | 0 },
                     그리기: function () {
-                      논리그리기(ctx,G2Native.frameToCanvas(프E, 팔E), 자E.x, 자E.y);
+                      논리그리기(ctx,G2Native.frameToCanvas캐시(프E, 팔E), 자E.x, 자E.y);
                     }
                   });
                 })(efr, 자리E, 마._펼친팔);
@@ -6192,11 +6192,11 @@ window.G2_셸이몬다 = true;
                     window.__그릴것.push({
                       발밑: (sp3.y | 0) + ((fr3.ay | 0) + (fr3.h | 0)),   /* 0x2280E */
                       발x: sp3.x | 0, 발y: (sp3.y | 0) + ((fr3.ay | 0) + (fr3.h | 0)), 크기: 마을인물가림크기(fr3, 팔3),
-                      마을입체인물: window.__마을입체모드 == null ? null : { canvas: G2Native.frameToCanvas(fr3, 팔3),
+                      마을입체인물: window.__마을입체모드 == null ? null : { canvas: G2Native.frameToCanvas캐시(fr3, 팔3),
                         x: sp3.x + (fr3.ax | 0), y: sp3.y + (fr3.ay | 0),
                         w: fr3.w | 0, h: fr3.h | 0 },
                       그리기: function () {
-                        논리그리기(ctx,G2Native.frameToCanvas(fr3, 팔3),
+                        논리그리기(ctx,G2Native.frameToCanvas캐시(fr3, 팔3),
                                       sp3.x + (fr3.ax | 0), sp3.y + (fr3.ay | 0));
                       }
                     });

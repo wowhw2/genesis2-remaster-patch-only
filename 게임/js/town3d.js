@@ -270,7 +270,8 @@
     s.깊이차례 = (s.깊이차례 | 0) + 1; s.깊이시작 = false;
     { var 마8 = root.__상태 && root.__상태.town, 깊키 = [w, h, s.캠.tilt, s.캠.rot, s.캠.dist, s.캠.fov, s.캠.zoom, s.캠.cx, s.캠.cy, 벽내리기값(), 마8 && 마8.좌표 ? 마8.좌표.x + ',' + 마8.좌표.y : '', s.덮개텍 ? 1 : 0].join('|');
       if (깊키 !== s.깊이키 || !s.깊이캐시) { s.깊이캐시 = {}; s.깊이키 = 깊키; s.깊이불가 = false; }
-      for (var 깊k in s.깊이캐시) if (s.깊이캐시[깊k].차례 < s.깊이차례 - 2) delete s.깊이캐시[깊k]; }
+      for (var 깊k in s.깊이캐시) if (s.깊이캐시[깊k].차례 < s.깊이차례 - 2) delete s.깊이캐시[깊k];
+      if (s.덮개캐시) for (var 덮k in s.덮개캐시) if (s.덮개캐시[덮k].차례 < s.깊이차례 - 2) delete s.덮개캐시[덮k]; }
     s.깊이 = false; if (root.__마을깊이가림 !== false && !줄차례만 && s.가림.깊이가림시작 && s.가림.깊이가림) try { if (s.깊이불가 || root.__깊이캐시끔) { s.깊이 = !!s.가림.깊이가림시작(); s.깊이시작 = true; } else s.깊이 = true; }   /* ☐ 참 깊이 가림은 아직 시험 중(뒤 인물이 안 가려짐) — 켤 때까지 예전 가림판 */ catch (e) { s.가림오류 = String(e && e.message || e); }
     return true;
   }
@@ -513,7 +514,20 @@
   function 덮개덮기(ctx, s, l, t, r, b, 발밑y, 크기) {
     var 동률 = s.키 === 'GRIK' && s.덮개정확 && !!(크기 && 크기.지도후등록 === true);
     var 판 = s.키 === 'GRIK' && !동률 ? s.덮개기존판 : s.덮개판, 덮 = s.덮개; if (!판 || !덮 || !s.장면판 || r <= l || b <= t) return 0;
-    var w = r - l, h = b - t, 덮자; try { 덮자 = 판.getContext('2d', { willReadFrequently: true }).getImageData(l, t, w, h); } catch (e) { return 0; }   /* 인물 상자만 읽는다 — 화면 전체를 장면마다 읽던 것이 느렸다 */
+    var w = r - l, h = b - t, 덮자;
+    /* 정본 349 — 덮개 지도(덮개키)·인물 상자·발밑이 그대로면 지난 «덮을 모양»을 쓴다. 인물마다 getImageData·putImageData 가 아이패드에서 장마다 약 48ms */
+    var 덮캐키 = (root.__덮개캐시끔 || root.__덮개기록 || !s.덮개키) ? null : [s.덮개키, 판 === s.덮개기존판 ? 1 : 0, l, t, w, h, 발밑y, 동률 ? 1 : 0].join('|');
+    if (덮캐키 && s.덮개캐시주인 !== s.덮개키) { s.덮개캐시 = {}; s.덮개캐시주인 = s.덮개키; }
+    var 덮옛 = 덮캐키 ? s.덮개캐시[덮캐키] : null;
+    if (덮옛) {
+      덮옛.차례 = s.깊이차례; if (!덮옛.수) return 0;
+      var 작옛 = s.덮개작판 || (s.덮개작판 = root.document.createElement('canvas')); if (작옛.width < w || 작옛.height < h) { 작옛.width = Math.max(작옛.width, w); 작옛.height = Math.max(작옛.height, h); }
+      var g옛 = 작옛.getContext('2d'); g옛.globalCompositeOperation = 'copy'; g옛.drawImage(덮옛.판, 0, 0);
+      g옛.globalCompositeOperation = 'source-in'; g옛.drawImage(s.장면판, l, t, w, h, 0, 0, w, h); g옛.globalCompositeOperation = 'source-over';
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(작옛, 0, 0, w, h, l, t, w, h); ctx.restore();
+      return 덮옛.수;
+    }
+    try { 덮자 = 판.getContext('2d', { willReadFrequently: true }).getImageData(l, t, w, h); } catch (e) { return 0; }   /* 인물 상자만 읽는다 — 화면 전체를 장면마다 읽던 것이 느렸다 */
     var 자 = 덮자.data, PW = w, 작 = s.덮개작판 || (s.덮개작판 = root.document.createElement('canvas'));
     if (작.width < w || 작.height < h) { 작.width = Math.max(작.width, w); 작.height = Math.max(작.height, h); }
     var g = 작.getContext('2d'); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, 작.width, 작.height);
@@ -522,6 +536,7 @@
       var n = 덮개행읽기(자, q); if (n < 1) continue;
       if (덮개앞인가(n, 발밑y, 동률)) { d[(y * w + x) * 4 + 3] = 255; 수++; } }
     if (root.__덮개기록) { var 코 = {}; for (var yy = 0; yy < h; yy += 2) for (var xx = 0; xx < w; xx += 2) { var qq = (yy * PW + xx) * 4; if (자[qq] >= 64) { var nn = 덮개행읽기(자, qq); 코[nn] = (코[nn] || 0) + 1; } } var 점9 = s.덮개점, 안수 = 0, 안넓이 = 0; if (점9) { var il = Math.max(l, Math.floor(점9.sx - 점9.k * 점9.sw / 2)), ir = Math.min(r, Math.ceil(점9.sx + 점9.k * 점9.sw / 2)), it = Math.max(t, Math.floor(점9.sy - 점9.k * 점9.sh)), ib = Math.min(b, Math.ceil(점9.sy)); 안넓이 = Math.max(0, ir - il) * Math.max(0, ib - it); for (var y9 = it; y9 < ib; y9++) for (var x9 = il; x9 < ir; x9++) if (d[((y9 - t) * w + x9 - l) * 4 + 3]) 안수++; } (s.덮개기록 = s.덮개기록 || []).push({ l: l, t: t, r: r, b: b, 발밑: 발밑y, 수: 수, 코: 코, 안수: 안수, 안넓이: 안넓이, sx: 점9 && 점9.sx, sy: 점9 && 점9.sy }); if (s.덮개기록.length > 20) s.덮개기록.shift(); }   /* 점검용 */
+    if (덮캐키) { var 덮판옛 = null; if (수) { 덮판옛 = root.document.createElement('canvas'); 덮판옛.width = w; 덮판옛.height = h; 덮판옛.getContext('2d').putImageData(im, 0, 0); } s.덮개캐시[덮캐키] = { 수: 수, 판: 덮판옛, 차례: s.깊이차례 }; }
     if (!수) return 0;
     g.putImageData(im, 0, 0); g.globalCompositeOperation = 'source-in'; g.drawImage(s.장면판, l, t, w, h, 0, 0, w, h); g.globalCompositeOperation = 'source-over';
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(작, 0, 0, w, h, l, t, w, h); ctx.restore();
