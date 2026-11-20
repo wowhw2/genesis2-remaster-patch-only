@@ -176,6 +176,9 @@ http.createServer(async (req, res) => {
       let 첫화면 = null; try { 첫화면 = fs.readFileSync(path.join(덮어쓰기, '설치', '모바일.html')); } catch (e) { 첫화면 = null; }
       return 보냄(res, 200, 'text/html; charset=utf-8', 첫화면 || fs.readFileSync(path.join(여기, '설치.html')));
     }
+    /* 정본 343 — 게임 «종료»: 앱 안 Node 는 앱과 같은 프로세스라 여기서 끝내면 앱이 통째로 꺼진다(아이폰 · 라이브 컨테이너 안에서도)
+     *   아이폰 본체에 종료 창구(g2exit)가 안 달린 경우를 위해 터치.js 가 이 주소로 온다 (신고 130617 «0.1.25 … 종료허기 누르면 멈추고 앱이 안꺼집니다» · 종료창구 false) */
+    if (p === '/exit') { 보냄(res, 200, 'text/html; charset=utf-8', '<body style="background:#000"></body>'); setTimeout(() => process.exit(0), 150); return; }
     if (p === '/state') { const r = 기록읽기(); return 제이슨(res, { 기록: r, 설치됨: !!(r && 창2폴더인가(r.창2) && r.창1), 찾음: 원본찾기(), 진행, 설치중, 설치오류, 바깥폴더: 바깥폴더후보[0] }); }
     if (p === '/reinstall' && req.method === 'POST') {   /* 정본 310 — 첫 화면 «다시 설치» */
       if (설치중 || 게임켬) return 제이슨(res, { 오류: 설치중 ? '설치 중입니다' : '게임이 이미 시작됐습니다 — 앱을 다시 켠 뒤 첫 화면에서 고르세요' }, 409);

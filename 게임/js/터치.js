@@ -287,7 +287,9 @@
    *   ⇒ 아이폰 본체(아이폰_시작.swift G2ExitGate)가 단 메시지 창구 «g2exit» 가 있으면 거기로 알려 앱을 끝낸다 · 없으면(안드로이드) 그대로 g2app://exit */
   if (!root.G2앱) root.G2앱 = { 종료: function () {
     var 창구 = root.webkit && root.webkit.messageHandlers && root.webkit.messageHandlers.g2exit;
-    if (창구) 창구.postMessage('exit'); else location.href = 'g2app://exit';
+    /* 정본 343 — 창구가 없는 아이폰·아이패드(라이브 컨테이너 등 · 신고 130617 종료창구 false)는 앱 안 Node 창구 /exit 로 — Node 가 끝나면 같은 프로세스인 앱이 꺼진다 */
+    var 애플 = /iP(hone|ad|od)/.test(navigator.userAgent || '') || (/Macintosh/.test(navigator.userAgent || '') && navigator.maxTouchPoints > 1);
+    if (창구) 창구.postMessage('exit'); else if (애플) location.href = 'http://127.0.0.1:47861/exit'; else location.href = 'g2app://exit';
   } };
   root.G2터치 = { 켜짐: true, ESC: function () { 키('Escape'); } };   /* ESC — 안드로이드 «뒤로»도 이것을 부른다(MainActivity) */
 })(typeof window !== 'undefined' ? window : this);
