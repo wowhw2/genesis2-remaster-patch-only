@@ -65,7 +65,7 @@
     o.보기3D = 해(function () { return localStorage.getItem('리마스터3D보기'); });
     o.모바일 = 모바일;
     o.메모리MB = 해(function () { return performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) + ' / ' + Math.round(performance.memory.jsHeapSizeLimit / 1048576) : null; });
-    o.리마스터판 = 해(function () { var t = document.title || ''; return root.G2리마스터판 || t; });
+    o.리마스터판 = 해(function () { return root.G2리마스터판 || (typeof document !== 'undefined' && document.title) || ''; });
     return o;
   }
   /* 휴대폰(주소 «모바일=1»)은 앱 창구(G2앱)가 없다 — 신고를 zip 으로 묶어 같은 받는 곳(구글 드라이브 Apps Script · 앱/신고설정.json 과 같은 주소)으로 곧바로 보낸다 */
@@ -102,7 +102,7 @@
   function 모으기(설명) {
     var b = root.battle, ct = root.ctrl, G = root.G2;
     return {
-      판: 판, 때: new Date().toISOString(), 설명: 설명 || '',
+      판: root.G2리마스터판 || 판, 때: new Date().toISOString(), 설명: 설명 || '',
       앱: !!root.G2앱, 주소: 해(function () { return location.pathname + location.search; }),
       창: 해(function () { return root.innerWidth + '×' + root.innerHeight; }),
       셸화면: 해(function () { return root.__셸 && __셸.수명주기 ? __셸.수명주기().화면 : null; }),
