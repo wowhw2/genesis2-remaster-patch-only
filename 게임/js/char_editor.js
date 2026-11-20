@@ -139,14 +139,14 @@ function 그리기() {
   몸.innerHTML =
     '<div style="width:min(250px,34vw);min-width:140px;display:flex;flex-direction:column;border-right:1px solid #3a4a3a">' +
       '<div style="padding:6px 8px;border-bottom:1px solid #3a4a3a;font-size:12.5px;color:#c8b890">현재 파티(진영 ' + 활동 + ') 소지금<br>' +
-        (팀값 ? '<input type="number" data-칸="소지금" value="' + 돈 + '" min="0" max="4294967295" style="' + 칸꼴 + ';width:100%;margin-top:3px">' : '<span style="color:#a8a080">없음</span>') + '</div>' +
+        (팀값 ? '<input type="number" inputmode="numeric" enterkeyhint="done" data-칸="소지금" value="' + 돈 + '" min="0" max="4294967295" style="' + 칸꼴 + ';width:100%;margin-top:3px">' : '<span style="color:#a8a080">없음</span>') + '</div>' +
       '<div style="flex:1;overflow-y:auto" class="g2에-목">' + 목 + '</div></div>' +
     '<div style="flex:1;overflow-y:auto;padding:4px 14px 2px;scrollbar-width:none" class="g2에-칸들">' + (c ? 칸들(c) : '') + '</div>';
   Array.prototype.forEach.call(몸.querySelectorAll('[data-코드]'), function (el) {
     el.addEventListener('click', function () { 지금.고른코드 = +el.getAttribute('data-코드'); 그리기(); });
   });
   Array.prototype.forEach.call(몸.querySelectorAll('[data-칸]'), function (el) {
-    el.addEventListener('change', function () { 고침(el.getAttribute('data-칸'), el.value); });
+    el.addEventListener('change', function () { if (el.__확정됨) return; 고침(el.getAttribute('data-칸'), el.value); });   /* Enter 로 이미 확정한 칸은 다시 그릴 때 오는 change 를 버린다(한 번 고친 것이 «저장 (2)»로 셌다) */
   });
   창.querySelector('.g2에-저장').disabled = !지금.고침수;
   창.querySelector('.g2에-저장').textContent = 지금.고침수 ? '저장 (' + 지금.고침수 + ')' : '저장';
@@ -237,7 +237,7 @@ function 스프라이트목록() {
 function 무리(제목, 안, 덧꼴) { return '<div style="flex:1;min-width:280px;border:1px solid #3a4a3a;background:#18221b;padding:6px 10px' + (덧꼴 || '') + '">' + (제목 ? '<div style="color:#f8e890;margin-bottom:4px">' + 제목 + '</div>' : '') + 안 + '</div>'; }
 function 반반(왼, 오) { return '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0">' + 왼 + 오 + '</div>'; }
 function 표줄(이름, 안, 덧) { return '<tr><td style="color:#c8b890;padding:2px 8px 2px 0;white-space:nowrap">' + 이름 + '</td><td style="padding:2px 0">' + 안 + (덧 ? ' <span style="color:#a8a080;font-size:12px">' + 덧 + '</span>' : '') + '</td></tr>'; }
-function 작은수(칸, 값, 최소, 최대, 폭) { return '<input type="number" data-칸="' + 칸 + '" value="' + 값 + '" min="' + 최소 + '" max="' + 최대 + '" title="' + 최소 + '~' + 최대 + '" style="' + 칸꼴 + ';width:' + (폭 || 90) + 'px">'; }
+function 작은수(칸, 값, 최소, 최대, 폭) { return '<input type="number" inputmode="numeric" enterkeyhint="done" data-칸="' + 칸 + '" value="' + 값 + '" min="' + 최소 + '" max="' + 최대 + '" title="' + 최소 + '~' + 최대 + '" style="' + 칸꼴 + ';width:' + (폭 || 90) + 'px">'; }
 function 칸들(c) {
   var K = 셈(), v = K.보기값(c), 한 = K.한도얻기(), 상 = (지금 && 지금.상태자산) || {};
   var 부 = function (n) { return (n | 0) === 0 ? '—' : ((n > 0 ? '+' : '−') + Math.abs(n | 0)); };
@@ -391,28 +391,70 @@ function 초점열쇠(el) {
   return c ? '.' + c : null;
 }
 var 옛초점 = null;
-function 초점되살리기() { if (!창 || !옛초점) return; var el = 창.querySelector(옛초점); if (el) { el.focus(); if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); } }
-function 초점(el) { if (!el) return; el.focus(); 옛초점 = 초점열쇠(el); if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); }
+function 초점되살리기() { if (!창 || !옛초점) return; var el = 창.querySelector(옛초점); if (el) { el.focus(); 자리표시(el); if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); } }
+var 바꿈중 = null;   /* { el, 옛값 } — ○ 로 잡은 숫자·고르개 */
+function 바꿈끝() { var el = 바꿈중 && 바꿈중.el; if (el) el.classList.remove('g2에-바꿈'); 바꿈중 = null; if (el) 자리표시(el); }
+/** 칸의 이름 자리 — 바로 앞 글 조각(화염·무기·진영·필살기) › 그 줄 첫 칸(레벨·완력·직업…) */
+function 이름자리(el) {
+  var 앞 = el && el.previousElementSibling;
+  if (앞 && 앞.tagName === 'SPAN' && !앞.hasAttribute('data-그림')) return 앞;
+  var 줄 = el && el.closest && el.closest('tr');
+  return 줄 && 줄.cells && 줄.cells[0] !== el.closest('td') ? 줄.cells[0] : null;
+}
+function 자리표시(el) {
+  if (!창) return;
+  Array.prototype.forEach.call(창.querySelectorAll('.g2에-자리'), function (x) { x.classList.remove('g2에-자리'); });
+  if (!el || !el.closest || !el.closest('.g2에-칸들') || el.classList.contains('g2에-바꿈')) return;
+  if (el.tagName !== 'INPUT' && el.tagName !== 'SELECT') return;
+  var 이 = 이름자리(el); if (이) 이.classList.add('g2에-자리');
+}
+/** 방향으로 가장 가까운 칸 — 그 방향 거리 + 옆으로 벗어난 만큼 덧셈(벗어남을 무겁게) · 없으면 null */
+function 옆칸(들, a, 방향) {
+  if (!a || !a.getBoundingClientRect) return 들[0];
+  var r = a.getBoundingClientRect(), ax = r.left + r.width / 2, ay = r.top + r.height / 2, 최고 = null, 최점 = Infinity;
+  들.forEach(function (b) {
+    if (b === a) return;
+    var q = b.getBoundingClientRect(); if (!q.width && !q.height) return;
+    var dx = q.left + q.width / 2 - ax, dy = q.top + q.height / 2 - ay, 앞쪽, 옆쪽;
+    if (방향 === '위') { 앞쪽 = -dy; 옆쪽 = Math.abs(dx); } else if (방향 === '아래') { 앞쪽 = dy; 옆쪽 = Math.abs(dx); }
+    else if (방향 === '왼쪽') { 앞쪽 = -dx; 옆쪽 = Math.abs(dy); } else { 앞쪽 = dx; 옆쪽 = Math.abs(dy); }
+    if (앞쪽 <= 2) return;
+    var 점 = 앞쪽 + 옆쪽 * 3; if (점 < 최점) { 최점 = 점; 최고 = b; }
+  });
+  return 최고;
+}
+function 초점(el) { if (!el) return; el.focus(); 자리표시(el); 옛초점 = 초점열쇠(el); if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); }
 function 패드(명령) {
   if (!창) return false;
   var 들 = 고를것들(), a = document.activeElement, i = 들.indexOf(a);
   if (i < 0 && 명령 !== '취소') { 초점(들[0]); return true; }
-  if (명령 === '위' || 명령 === '아래') { 초점(들[Math.max(0, Math.min(들.length - 1, i + (명령 === '위' ? -1 : 1)))]); return true; }
-  if (명령 === '왼쪽' || 명령 === '오른쪽') {
-    var d = 명령 === '왼쪽' ? -1 : 1;
-    if (a.tagName === 'INPUT' && a.type === 'number') {
-      var 최대 = Number(a.max) || 0, 걸음 = 최대 >= 1e6 ? 1000 : 최대 >= 1e4 ? 10 : 1;   /* 패드로 소지금을 1씩은 너무 느리다 — 소지금 1000 · HP·MP 10 · 나머지 1 */
-      a.value = Math.max(Number(a.min) || 0, Math.min(최대 || Infinity, (Number(a.value) || 0) + d * 걸음)); 고침(a.getAttribute('data-칸'), a.value); return true;
+  /* 방향키 = 화면 자리대로 칸 옮기기 · ○ = 숫자·고르개를 «바꾸는 중»으로 잡기 → 위·아래로 바꾸고(좌·우는 10배) ○ 확정 · ✕ 원래대로
+   *   (사장님 11-21 「방향키로 전후좌우 움직이고 값 바꿀때 동그라미로 선택한뒤에 위아래로 바꾸는게 낫지 않아?」·「그상태에서 바꾸고 동그라미 누르면 확정 아니면 취소되면서 원래대로」) */
+  if (바꿈중 && 바꿈중.el === a && a.isConnected) {
+    if (명령 === '위' || 명령 === '아래' || 명령 === '왼쪽' || 명령 === '오른쪽') {
+      var 크게 = 명령 === '왼쪽' || 명령 === '오른쪽', 올림 = 명령 === '위' || 명령 === '오른쪽' ? 1 : -1;
+      if (a.tagName === 'SELECT') {   /* 고르개는 목록 차례대로 — 위 = 앞 항목 */
+        var 칸수 = 크게 ? 10 : 1, n = Math.max(0, Math.min(a.options.length - 1, a.selectedIndex + (명령 === '위' || 명령 === '왼쪽' ? -칸수 : 칸수)));
+        a.selectedIndex = n;
+      } else {
+        var 최대 = Number(a.max) || 0, 걸음 = 최대 >= 1e6 ? 1000 : 최대 >= 1e4 ? 10 : 1;   /* 소지금 1000 · HP·MP 10 · 나머지 1 */
+        if (크게) 걸음 *= 10;
+        a.value = Math.max(Number(a.min) || 0, Math.min(최대 || Infinity, (Number(a.value) || 0) + 올림 * 걸음));
+      }
+      return true;
     }
-    if (a.tagName === 'SELECT') { var n = Math.max(0, Math.min(a.options.length - 1, a.selectedIndex + d)); if (n !== a.selectedIndex) { a.selectedIndex = n; 고침(a.getAttribute('data-칸'), a.value); } return true; }
-    if (a.getAttribute('data-코드') && d > 0) { 초점(창.querySelector('.g2에-칸들 [data-칸]')); return true; }   /* 목록 → 고칠 칸 */
-    if (a.getAttribute('data-슬롯') || a.closest('.g2에-물음') || /g2에-(다시|저장|닫기)/.test(a.className)) { 초점(들[Math.max(0, Math.min(들.length - 1, i + d))]); return true; }
-    if (d < 0 && a.closest('.g2에-칸들')) { 초점(창.querySelector('.g2에-목 [data-코드="' + (지금 && 지금.고른코드) + '"]')); return true; }   /* 칸 → 목록 */
+    if (명령 === '확인') { var 칸 = a.getAttribute('data-칸'), 값 = a.value, 바뀜 = 값 !== 바꿈중.옛값; 바꿈끝(); a.__확정됨 = true; if (바뀜) 고침(칸, 값); else 알림(''); return true; }
+    if (명령 === '취소') { a.value = 바꿈중.옛값; 바꿈끝(); 알림('바꾸기를 취소했습니다'); return true; }
     return true;
   }
+  if (바꿈중) 바꿈끝();
+  if (명령 === '위' || 명령 === '아래' || 명령 === '왼쪽' || 명령 === '오른쪽') { var 옆 = 옆칸(들, a, 명령); if (옆) 초점(옆); return true; }
   if (명령 === '확인') {
     if (a.type === 'checkbox') { a.checked = !a.checked; a.dispatchEvent(new Event('change')); return true; }
-    if (a.tagName === 'INPUT') { a.blur(); a.focus(); return true; }   /* 숫자를 친 뒤 확정 */
+    if (a.tagName === 'INPUT' && a.type === 'number' && a.value !== a.defaultValue) { a.__확정됨 = true; 고침(a.getAttribute('data-칸'), a.value); return true; }   /* 키보드로 숫자를 친 뒤 Enter = 확정 */
+    if ((a.tagName === 'INPUT' && a.type === 'number') || a.tagName === 'SELECT') {
+      바꿈중 = { el: a, 옛값: a.value }; a.classList.add('g2에-바꿈'); 자리표시(null); 알림('○ 확정 · ✕ 취소'); return true;
+    }
     if (a.getAttribute('data-코드')) { a.click(); 초점(창.querySelector('.g2에-칸들 [data-칸]')); return true; }
     a.click(); return true;
   }
@@ -437,7 +479,7 @@ function 판맞추기() {
   if (배 >= 0.7) { 판.style.width = 판너비 + 'px'; 판.style.height = 판높이 + 'px'; 판.style.zoom = String(배); }
   else { 판.style.width = 'min(980px,96vw)'; 판.style.height = 'min(720px,94vh)'; 판.style.zoom = ''; }
 }
-function 닫기() { root.removeEventListener('resize', 판맞추기); if (창 && 창.parentNode) 창.parentNode.removeChild(창); 창 = null; 지금 = null; 옛초점 = null; root.__캐릭터에디터열림 = false; }
+function 닫기() { 바꿈중 = null; root.removeEventListener('resize', 판맞추기); if (창 && 창.parentNode) 창.parentNode.removeChild(창); 창 = null; 지금 = null; 옛초점 = null; root.__캐릭터에디터열림 = false; }
 function 닫기물음() { if (지금 && 지금.고침수) 물음('저장하지 않은 고침이 있습니다. 버리고 닫을까요?', 닫기); else 닫기(); }
 
 function 열기() {
@@ -449,6 +491,7 @@ function 열기() {
   if (!document.getElementById('g2에디터꼴')) { var 꼴 = document.createElement('style'); 꼴.id = 'g2에디터꼴'; 꼴.textContent = '.g2에디터 :focus{outline:2px solid #f8e890;outline-offset:1px}.g2에디터 [data-코드]:focus{background:#2e3e30}' +
       '.g2에디터 [data-칸^="마법:"],.g2에디터 [data-칸^="필살기:"]{padding-left:4px!important;padding-right:2px!important;text-align:center;-moz-appearance:textfield}.g2에디터 [data-칸^="마법:"]::-webkit-inner-spin-button,.g2에디터 [data-칸^="필살기:"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}' +
       '.g2에디터 .g2에-칸들::-webkit-scrollbar{display:none}' +
+      '.g2에디터 .g2에-칸들 input:focus:not(.g2에-바꿈),.g2에디터 .g2에-칸들 select:focus:not(.g2에-바꿈){outline:none}.g2에디터 .g2에-자리{outline:2px solid #f8e890;outline-offset:2px}.g2에디터 .g2에-바꿈{outline:2px solid #f8e890!important;outline-offset:1px}' +
       '.g2에디터 .g2에-몸 input,.g2에디터 .g2에-몸 select{padding-top:1px!important;padding-bottom:1px!important;font-size:13px!important}.g2에디터 .g2에-몸 td{padding-top:1px!important;padding-bottom:1px!important}' +
       '@media (max-height:520px){.g2에디터 .g2에-안내{font-size:11px;line-height:1.35}.g2에디터 .g2에-머리{padding:5px 10px}}';   /* 휴대폰 가로 — 안내·머리를 줄여 고칠 칸 자리를 넓힌다 */ document.head.appendChild(꼴); }   /* g2판 — 휴대폰 터치를 그대로 통과(터치.js 판위) · 목록·스크롤이 손가락으로 된다 */
   창.style.cssText = 'position:fixed;inset:0;z-index:2147482000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font:14px "Malgun Gothic",sans-serif;';
@@ -467,6 +510,7 @@ function 열기() {
         '<button class="g2에-저장" style="' + 단추꼴 + '" disabled>저장</button>' +
         '<button class="g2에-닫기" style="' + 단추꼴 + '">닫기 (Esc)</button></div>' +
     '</div>';
+  창.addEventListener('focusin', function (e) { if (!바꿈중) 자리표시(e.target); });
   /* 창 안의 키·마우스·터치는 게임으로 새지 않게 (버그 신고 창과 같다) */
   ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel', 'contextmenu', 'touchstart', 'touchmove', 'touchend'].forEach(function (t) {
     창.addEventListener(t, function (e) {
