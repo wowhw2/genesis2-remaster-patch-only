@@ -125,7 +125,7 @@
     'textarea,input{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;touch-action:auto}' +   /* 정본 342 — 글칸은 고르기·복사·붙여넣기 */
     '.g2판 button{font:bold 13px sans-serif;color:#f8e890;background:rgba(40,48,40,0.55);border:1px solid rgba(248,232,144,0.4);border-radius:8px;padding:0;touch-action:none}' +
     '.g2판 button.눌림{background:rgba(200,168,72,0.75);color:#201808}' +
-    '#터치단추{position:fixed;right:6px;top:8px;z-index:2147483000;display:flex;flex-direction:column;gap:8px}' +
+    '#터치단추{position:fixed;right:6px;top:8px;z-index:2147483000;display:flex;flex-direction:row;gap:8px}' +   /* 정본 345 — 가로로 나란히(높이 46) · 세로로 쌓으면 92 까지 내려와 낮은 화면에서 오른쪽 패드 R2 와 겹쳤다 */
     '#터치단추 button{width:52px;height:38px}' +
     '#가상왼,#가상오{position:fixed;bottom:10px;z-index:2147482999;display:none;opacity:0.85}' +
     /* 아이폰 카메라 구멍·둥근 모서리(안전 영역)를 피한다 — 11-20 아이폰 시뮬레이터 실측: 왼쪽 가장자리 L2·◀ 가 가려짐 (아래 viewport-fit=cover 가 있어야 env 값이 나온다) */
@@ -226,6 +226,17 @@
     /* 세로도 — 단추 줄(0.8 + 3칸) + 스틱(2.2칸) + 틈이 화면 높이에 들어가게 (정본 303 스틱 더함) */
     칸w = Math.max(30, Math.min(칸w, Math.floor((innerHeight - 20 - 14 - 24) / 6)));
     document.documentElement.style.setProperty('--g2칸', 칸w + 'px');
+    /* 정본 345 — 오른쪽 패드 위끝이 ESC·패드 단추 아래(+6)보다 올라오면 그만큼 칸을 줄인다 (사장님 11-20 「지금은 esc랑 r2가 겹쳐」 · 844×390 에서 패드 위 12 / 단추 아래 92)
+     *   패드 높이는 칸에 비례(약 6.9칸) — 모자란 높이 ÷ 6.9 만큼 줄이고 한 번 더 잰다 */
+    var 오판 = document.getElementById('가상오'), 단추판 = document.getElementById('터치단추');
+    if (오판 && 단추판 && 오판.getBoundingClientRect().height > 0) {   /* 고정 위치라 offsetParent 는 늘 null — 크기로 본다(패드 꺼짐 = 0) */
+      for (var 번 = 0; 번 < 3; 번++) {
+        var 모자람 = 단추판.getBoundingClientRect().bottom + 6 - 오판.getBoundingClientRect().top;
+        if (모자람 <= 0 || 칸w <= 30) break;
+        칸w = Math.max(30, 칸w - Math.ceil(모자람 / 6.9));
+        document.documentElement.style.setProperty('--g2칸', 칸w + 'px');
+      }
+    }
   }
   var 크기시작 = Date.now();
   addEventListener('resize', 크기맞추기); setInterval(크기맞추기, 2000);
