@@ -103,8 +103,32 @@ function 일시키기(일) {
     w.on('error', no);
   });
 }
+/* 정본 331 — cue 의 FILE 이름과 올린 이미지 이름이 다르면(이미지 이름을 바꿨거나 다른 cue) 설치가 «ENOENT … 원본받음/gne2.img» 로 멈췄다
+ *   (사장님 11-20 아이폰 제보 「원본받음/gne2.img래」) ⇒ 그 이름의 파일이 없으면 같은 폴더의 CD 이미지(.bin·.img·.iso) 중 창1 이 아닌 가장 큰 것으로
+ *   «고친_<cue이름>» 을 같은 폴더에 써서 그것으로 설치한다 · 설치엔진.js 도 같은 대체를 하지만 그건 새 앱부터라 본체(패치로 감)에서도 막는다 */
+function 큐맞추기(cue, 창1) {
+  if (!cue || !/\.cue$/i.test(cue)) return cue;
+  try {
+    const 날 = fs.readFileSync(cue), 유 = 날.toString('utf8'), 글씨 = 유.indexOf(String.fromCharCode(0xFFFD)) < 0 ? 'utf8' : 'latin1';   /* 한글 이미지 이름이 깨지지 않게 — 설치엔진 큐글 과 같다 */
+    const 폴더 = path.dirname(cue), 글 = 날.toString(글씨), m = /FILE\s+"([^"]+)"/i.exec(글);
+    if (!m) return cue;
+    const 이름들 = fs.readdirSync(폴더), 적힌 = path.basename(m[1]);
+    if (이름들.some(n => n.toUpperCase() === 적힌.toUpperCase())) return cue;   /* 있다(대소문자만 달라도 설치엔진이 찾는다) */
+    const 후보 = 이름들.filter(n => /\.(bin|img|iso)$/i.test(n) && path.join(폴더, n) !== 창1 && !/창1|창세기전1|창세기전 1|GENESIS1/i.test(n))
+      .map(n => { let 크기 = 0; try { 크기 = fs.statSync(path.join(폴더, n)).size; } catch (e) { } return { n, 크기 }; }).sort((a, b) => b.크기 - a.크기);
+    if (!후보.length) {
+      if (fs.existsSync(path.join(폴더, 적힌 + '.받는중'))) throw new Error('CD 이미지(' + 적힌 + ')가 아직 다 올라가지 않았습니다 — 그 파일을 다시 올려 주세요');   /* 올리기 도중 끊김 */
+      return cue;
+    }
+    const 고친 = path.join(폴더, '고친_' + path.basename(cue).replace(/^고친_/, ''));
+    fs.writeFileSync(고친, 글.replace(m[0], 'FILE "' + 후보[0].n + '"'), 글씨);
+    console.log('[모바일] cue 의 FILE «' + 적힌 + '» 이 없어 «' + 후보[0].n + '» 로 고친 cue 로 설치: ' + 고친);
+    return 고친;
+  } catch (e) { if (/다 올라가지 않았습니다/.test(e.message)) throw e; return cue; }
+}
 async function 설치하기() {
   const 찾 = 원본찾기();
+  if (찾.창2) 찾.창2 = 큐맞추기(찾.창2, 찾.창1);
   if (!찾.창2) throw new Error('창세기전 2 CD 이미지(.cue + .bin, 또는 .iso)를 찾지 못했습니다');
   if (!찾.창1) throw new Error('창세기전 1 원본(CD 이미지 .iso)을 찾지 못했습니다 — 창세기전 2 리마스터는 창세기전 1 원본이 꼭 있어야 합니다');
   const 대상 = path.join(데이터, 'GENESIS2'), 파생 = path.join(데이터, '파생');

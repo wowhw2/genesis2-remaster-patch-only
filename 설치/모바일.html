@@ -185,7 +185,9 @@ $('패치받기').addEventListener('click', function () {
         if (s.오류) { clearInterval(타); 풀기(); $('패치받기').disabled = false; 막.style.display = 'none'; $('패치말').textContent = '패치를 받지 못했습니다 — ' + s.오류; }
         else if (!s.패치중 && s.끝) {
           clearInterval(타); 풀기(); $('패치받기').style.display = 'none'; 막.firstChild.style.width = '100%';
-          $('패치말').textContent = '패치 ' + s.끝.판 + ' 를 받았습니다 — «바로 시작» 을 누르세요.';
+          $('패치말').textContent = $('설치됨').style.display === 'none'
+            ? '패치 ' + s.끝.판 + ' 를 받았습니다 — 앱을 완전히 껐다가 다시 켠 뒤 설치해 주세요.'   /* 설치 전 — 본체가 바뀌는 패치는 다시 켜야 걸린다 */
+            : '패치 ' + s.끝.판 + ' 를 받았습니다 — «바로 시작» 을 누르세요.';
           $('바로시작').focus();
           fetch('/notes').then(function (r) { return r.text(); }).then(function (t) { 노트채우기(t); }).catch(function () {});   /* 받은 패치의 릴리즈노트로 다시 */
         }
@@ -237,7 +239,9 @@ addEventListener('keydown', function (e) {
     전 = 지금; requestAnimationFrame(살피기);
   })();
 })();
-상태().then(function (s) { if (s.설치됨) 설치됨화면(s); 그리기(s); });
+/* 정본 331 — 설치 전 화면에서도 새 패치를 본다: 설치가 막힌 사람(아이폰 cue 이름 다름)도 고친 본체를 받을 수 있게 · 패치 줄을 설치 칸 맨 위로 옮겨 쓴다 */
+function 설치전패치() { var 줄 = $('패치줄'); $('설치칸').insertBefore(줄, $('설치칸').firstChild); 패치살피기(); }
+상태().then(function (s) { if (s.설치됨) 설치됨화면(s); else 설치전패치(); 그리기(s); });
 </script>
 </body>
 </html>
