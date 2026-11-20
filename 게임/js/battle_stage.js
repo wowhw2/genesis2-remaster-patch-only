@@ -218,7 +218,7 @@ var 개발패널 = [
     "      <input type=\"checkbox\" id=\"optSellReturn\" checked style=\"float:right;margin-top:5px\"></label>",
     "    <label title=\"켜면 마법 링 첫 룬(속성) 아이콘이 속성 색으로 보이고(화염 빨강·빙한 하늘·전격 노랑·회복 초록·보조 흰색·소환 주황·암흑 보라), 룬에 커서를 대면 그 룬으로 쓸 수 있는 마법이 목록에서 빛납니다. 끄면 원작대로입니다.\">마법 룬 속성 색·목록 빛내기",
     "      <input type=\"checkbox\" id=\"optRuneGuide\" checked style=\"float:right;margin-top:5px\"></label>",
-    "    <label title=\"켜면 눈밭처럼 밝은 바닥에서 이동·대상·효과 범위 칸이 푸른 기로 표시되어 잘 보입니다(원작 방식으로는 흰 바닥이 거의 안 바뀌는 색만 바꾸고, 다른 바닥은 원작과 같은 색입니다). 끄면 원작대로입니다.\">눈밭(밝은 바닥) 범위 칸 잘 보이게",
+    "    <label title=\"켜면 눈밭 맵에서 흰 눈 위의 이동·대상·효과 범위 칸이 노르스름하게 표시되어 잘 보입니다(원작 방식으로는 흰 눈이 더 하얘질 뿐이라 거의 안 보입니다). 흙·바위 등 다른 바닥과 눈밭이 아닌 맵(빙룡성 포함)은 원작과 같습니다. 끄면 원작대로입니다.\">눈밭(밝은 바닥) 범위 칸 잘 보이게",
     "      <input type=\"checkbox\" id=\"optBrightMark\" checked style=\"float:right;margin-top:5px\"></label>",
     "    <label title=\"소환한 몬스터의 이름을 한글 종류 이름으로 보여줍니다(고 블 린 · 샐러맨더 …). 끄면 원작대로 어떤 소환수든 「소 환 수」로만 뜹니다. 자간은 원작 규칙(64픽셀 맞춤)을 그대로 씁니다.\">소환수 한글 이름",
     "      <input type=\"checkbox\" id=\"optSummonNameKo\" style=\"float:right;margin-top:5px\"></label>",
