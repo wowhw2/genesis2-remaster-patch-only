@@ -34,7 +34,7 @@
  * ============================================================ */
 'use strict';
 (function (root) {
-  var 리마스터판 = 'R0.1.7';   /* ★ 리마스터 판 번호 — 시작화면 왼쪽 아래 · 릴리즈노트.txt 머리 «판 R0.1.0» 과 함께 바꾼다 (정본 275) */
+  var 리마스터판 = 'R0.1.8';   /* ★ 리마스터 판 번호 — 시작화면 왼쪽 아래 · 릴리즈노트.txt 머리 «판 R0.1.0» 과 함께 바꾼다 (정본 275) */
 
   var SH = root.G2Shell || (typeof require === 'function' ? require('./shell.js') : null);
   var BB = root.G2Blackbox || (typeof require === 'function' ? require('./blackbox.js') : null);
@@ -10889,6 +10889,8 @@ function 마을배경음(상태) {
       O.cfg.music = !!(o.BGM | 0);
       O.cfg.sfx   = !!(o.FX  | 0);
       O.cfg.속도  = (o.속도 | 0);
+      O.cfg.scroll = (o.속도 | 0) === 1;           /* 원본은 Speed 한 값(GAME.CFG 첫 u16 · 0x4E3A8 · 0x4FE8F)을 월드·마을 Speed 와 전투 SCROLL 속도가 같이 쓴다 (정본 323 · 사장님 11-20 「게임 속도(원작 옵션에 있는 기본 설정) 아직도 자꾸 초기화되는데?」) */
+      try { var W속 = (typeof window !== 'undefined') ? window : null; if (W속) { W속.G2 = W속.G2 || {}; W속.G2['스크롤옵션'] = O.cfg.scroll ? 1 : 0; } } catch (e속) { }
       O.저장();                                   // 0x4FFD9 자동 저장
     }
     /* ★ 여기가 「적용」이다 — `opt.js` 는 스키마·저장만 하고 적용은 어댑터가 한다 */

@@ -13267,7 +13267,7 @@
         case 5:                                        // 0x4E3A1  TURN 간격
           turnInterval(); break;
         case 6:                                        // 0x4E3A8  SCROLL 속도
-          cfg.scroll = !cfg.scroll; save(); applyScroll(); break;
+          cfg.scroll = !cfg.scroll; cfg.속도 = cfg.scroll ? 1 : 0; save(); applyScroll(); break;   /* 원본은 Speed 한 값(GAME.CFG 첫 u16 · 0x4E3A8 · 0x4FE8F)을 월드·마을 Speed 와 전투 SCROLL 속도가 같이 쓴다 (정본 323 · 사장님 11-20 「게임 속도(원작 옵션에 있는 기본 설정) 아직도 자꾸 초기화되는데?」) */
         case 7:                                        // 0x4E3D3  전투 처음부터
           /* ★★★★★ **셸에서는 페이지를 새로 고치면 안 된다** (2026-08-25 · 사용자 지적)
            *   「**전투 처음부터를 눌렀는데 오프닝으로 돌아가버리고**」
@@ -15575,10 +15575,11 @@
       /* 옵션 메뉴의 SCROLL 아이콘과 어긋나지 않게 같이 맞춘다 (0x4DC57) */
       window.G2 = window.G2 || {};
       window.G2['스크롤옵션'] = (R.followMode === 'instant') ? 1 : 0;
-      if (window.__Opt) window.__Opt.cfg.scroll = (R.followMode === 'instant');
+      if (window.__Opt) { window.__Opt.cfg.scroll = (R.followMode === 'instant'); window.__Opt.cfg.속도 = window.__Opt.cfg.scroll ? 1 : 0; }   /* 한 값 (정본 323) */
     }
     var q = (location.search.match(/[?&](?:센터링|follow)=([a-z]+)/i) || [])[1];
     if (q === 'instant' || q === 'smooth') sel.value = q;
+    else if (window.__Opt && window.__Opt.cfg) sel.value = window.__Opt.cfg.scroll ? 'instant' : 'smooth';   /* ☠ 칸 기본값(부드럽게)이 전투를 열 때마다 저장된 «빠름»을 덮었다 (정본 323) */
     put(sel.value);
     sel.addEventListener('change', function () {
       put(sel.value);
