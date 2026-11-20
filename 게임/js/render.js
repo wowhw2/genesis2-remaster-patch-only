@@ -4235,7 +4235,7 @@ Renderer.prototype._가시리맵판 = function () {
   /* ★ 2026-10-12 넓힘 — 사장님 「가시뿐만아니라 다른 오브젝트 위에 올라갈때도 같은 방식이어야해」: 무덤 가시만이 아니라 어느 맵이든 눕혀 그린 오브젝트 전부 */
   var pal = this._유닛팔레트(), m = this.nmap, g = this._floorIdx;
   if (!pal || !m || !g || !g.idx || !root.G2Remap || !root.G2Remap['표1'] || !root.G2Native) return null;
-  var 보강 = !!(root.G2Remap.표식보강켬 && root.G2Remap.표식보강켬());   /* [리마스터 밝은바닥표식] 정본 316 */
+  var 보강 = !!(root.G2Remap.표식보강켬 && root.G2Remap.표식보강켬()) && this._눈밭맵(pal);   /* [리마스터 밝은바닥표식] 눈밭 맵에서만 (정본 316) */
   if (this._가시리맵URL && this._가시리맵팔 === pal && this._가시리맵보강 === 보강) return this._가시리맵URL;
   try {
     var self = this, W = g.w, H = g.h, idx = new Int16Array(g.idx.length);
@@ -4251,7 +4251,7 @@ Renderer.prototype._가시리맵판 = function () {
     });
     this._눕힘덮인칸 = 덮인; this._눕힘덮인칸맵 = m;
     if (!있음) { this._가시리맵URL = null; this._가시리맵팔 = pal; return null; }
-    var palH = root.G2Remap['표1그릴색'](pal, 보강);   /* 표1(강도 30·보정 9) — 보강이면 안 보이는 밝은 색만 푸른 기 */
+    var palH = root.G2Remap['표1그릴색'](pal, 보강, 보강);   /* 표1(강도 30·보정 9) — 눈밭 맵 보강이면 눈 색만 하늘색 */
     this._가시리맵URL = root.G2Native.frameToCanvas({ w: W, h: H, idx: idx, tr: g.tr }, palH).toDataURL();
     this._가시리맵팔 = pal; this._가시리맵보강 = 보강;
     /* ☠ 주소를 요소마다 쓰면 안 된다 — 아래 _범위리맵바닥 과 같은 함정(맵 한 장 data-URL 수백 KB × 칸 수 · 매 프레임)
@@ -4270,13 +4270,23 @@ Renderer.prototype.덮인칸 = function (x, y) {
   if (this._눕힘덮인칸맵 !== this.nmap) { this._가시리맵URL = null; this._가시리맵판(); }
   return !!(this._눕힘덮인칸 && this._눕힘덮인칸[(x | 0) + ',' + (y | 0)]);
 };
+/** [리마스터 밝은바닥표식] 지금 맵이 눈밭인가 — 바닥 그림 색으로 (remap.js 눈밭인가 · 정본 316) · 팔레트·바닥이 같으면 한 번만 센다
+ *   3D 원경(리마스터3D 원경리맵)은 바닥을 모르므로 여기서 root.__눈밭맵 으로 알린다 */
+Renderer.prototype._눈밭맵 = function (pal) {
+  var g = this._floorIdx;
+  if (this._눈밭판 === pal && this._눈밭바닥 === g) return !!this._눈밭;
+  this._눈밭판 = pal; this._눈밭바닥 = g;
+  this._눈밭 = !!(g && g.idx && root.G2Remap && root.G2Remap.눈밭인가 && root.G2Remap.눈밭인가(pal, g.idx));
+  root.__눈밭맵 = this._눈밭;
+  return this._눈밭;
+};
 Renderer.prototype._범위리맵바닥 = function () {
   var pal = this._유닛팔레트();
   if (!pal || !this._floorIdx || !root.G2Remap || !root.G2Remap['표1'] || !root.G2Native) return null;
-  var 보강 = !!(root.G2Remap.표식보강켬 && root.G2Remap.표식보강켬());   /* [리마스터 밝은바닥표식] 눈밭 등 밝은 바닥 (정본 316) */
+  var 보강 = !!(root.G2Remap.표식보강켬 && root.G2Remap.표식보강켬()) && this._눈밭맵(pal);   /* [리마스터 밝은바닥표식] 눈밭 맵에서만 (정본 316) */
   if (this._범위리맵URL && this._범위리맵팔 === pal && this._범위리맵보강 === 보강) return this._범위리맵URL;
   try {
-    var palH = root.G2Remap['표1그릴색'](pal, 보강);   /* 목표 1 · 강도 30 · 보정 9 — 보강이면 안 보이는 밝은 색만 푸른 기 */
+    var palH = root.G2Remap['표1그릴색'](pal, 보강, 보강);   /* 목표 1 · 강도 30 · 보정 9 — 눈밭 맵 보강이면 눈 색만 하늘색 */
     palH._기록바탕 = pal._기록바탕 || pal; /* 계측 전용 꼬리표 — 이 팔레트를 만든 원래 팔레트(암전 판정 · 04_도구/우리그리기기록.js · 2026-09-27) */
     this._범위리맵URL = root.G2Native.frameToCanvas(this._floorIdx, palH).toDataURL();
     this._범위리맵팔 = pal; this._범위리맵보강 = 보강;
@@ -4908,7 +4918,7 @@ Renderer.prototype._원경짓기 = function () {
           /* ★ 리맵 벌도 열쇠로 쥔다 — 연출 중(_palSaved · 섞인 팔레트)에는 표식이 없으니 굽지 않는다(2026-11-13 · 위 원경 캐시 주석). */
           var 리맵css = (캐 && 캐.리맵) ? 캐.리맵 : null;
           if (!리맵css && !self._palSaved && root.G2Remap && root.G2Remap['표1'] && _fpmPal && _fpmPal.length >= 768) {
-            var palR = root.G2Remap['표1그릴색'](_fpmPal, !!(root.G2Remap.표식보강켬 && root.G2Remap.표식보강켬()));   /* [리마스터 밝은바닥표식] 정본 316 */
+            var palR = root.G2Remap['표1그릴색'](_fpmPal, !!(root.G2Remap.표식보강켬 && root.G2Remap.표식보강켬()), !!root.__눈밭맵);   /* [리마스터 밝은바닥표식] 눈밭 맵에서만 (정본 316) */
             var cvR = root.G2Native.frameToCanvas({ w: d.w, h: d.h, idx: d.idx, tr: (d.tr == null ? null : d.tr) }, palR);
             var cWR = cvR.width | 0, cHR = cvR.height | 0, kR = (self._fpmW > 0 && cWR > 0) ? cWR / self._fpmW : 1;
             var sxR = Math.round(왼잘 * kR), sWR = Math.round(내용W * kR);

@@ -248,7 +248,7 @@
       원경리맵: function (그림) {
         var pal = 구운것 && 구운것.바탕팔, RM = root.G2Remap;
         if (!그림 || !pal || pal.length < 768 || !RM || typeof RM['표1'] !== 'function') return null;
-        var 그릴색 = RM['표1그릴색'] ? RM['표1그릴색'](pal, !!(RM.표식보강켬 && RM.표식보강켬())) : null, LUT = RM['표1'](pal, 9), w = 그림.width, h = 그림.height;   /* [리마스터 밝은바닥표식] 정본 316 */
+        var 그릴색 = RM['표1그릴색'] ? RM['표1그릴색'](pal, !!(RM.표식보강켬 && RM.표식보강켬()), !!root.__눈밭맵) : null, LUT = RM['표1'](pal, 9), w = 그림.width, h = 그림.height;   /* [리마스터 밝은바닥표식] 정본 316 */
         var c = root.document.createElement('canvas'); c.width = w; c.height = h;
         var g = c.getContext('2d'); g.drawImage(그림, 0, 0);
         var im = g.getImageData(0, 0, w, h), d = im.data, 사전 = {}, i;
