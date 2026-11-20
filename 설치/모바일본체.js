@@ -80,14 +80,16 @@ function 파일들(d) { try { return fs.readdirSync(d).map(n => path.join(d, n))
 function 원본찾기() {
   const 실경로 = p => { try { return fs.realpathSync(p); } catch (e) { return p; } };   /* /sdcard 와 /storage/emulated/0 은 같은 곳 — 한 번만 */
   const 모두 = [...new Set([올린폴더, ...바깥폴더후보].flatMap(d => [...파일들(d), ...파일들(path.join(d, '창2')), ...파일들(path.join(d, '창1'))]).map(실경로))];
-  const 이름 = p => path.basename(p).toUpperCase();
+  /* 정본 331 — 애플 기기는 한글 이름을 자모로 풀어(NFD) 둘 수 있다 → «창세기전2» 글자 견주기가 빗나갔다 · 모아 쓴 꼴(NFC)로 맞춰 견준다 */
+  const 밑 = p => path.basename(p).normalize('NFC');
+  const 이름 = p => 밑(p).toUpperCase();
   /* 창2 — GENESIS2.CUE 우선 · 없으면 크기가 큰 .bin/.iso 중 창1 이 아닌 것 */
-  const 창2 = 모두.find(p => /\.CUE$/.test(이름(p)) && /GENESIS2|창세기전2|창세기전 2/i.test(path.basename(p)))
-    || 모두.find(p => /\.CUE$/.test(이름(p)) && !/창1|GENESIS1|창세기전1/i.test(p))
-    || 모두.find(p => /\.(BIN|ISO|IMG)$/.test(이름(p)) && /GENESIS2|창세기전2/i.test(path.basename(p)));
+  const 창2 = 모두.find(p => /\.CUE$/.test(이름(p)) && /GENESIS2|창세기전2|창세기전 2/i.test(밑(p)))
+    || 모두.find(p => /\.CUE$/.test(이름(p)) && !/창1|GENESIS1|창세기전1/i.test(p.normalize('NFC')))
+    || 모두.find(p => /\.(BIN|ISO|IMG)$/.test(이름(p)) && /GENESIS2|창세기전2/i.test(밑(p)));
   /* .img 도 받는다 — 창1 원본을 .img 로 가진 사람이 많다 (사장님 11-20 「그리고 창세기전1 img가 안된다는 이야기가 있네」 · 정본 302) */
-  const 창1 = 모두.find(p => /\.(ISO|CUE|IMG)$/.test(이름(p)) && /창세기전1|창세기전 1|GENESIS1|GENESIS\.|창1/i.test(path.basename(p)) && p !== 창2)
-    || 모두.find(p => /\.(ISO|IMG)$/.test(이름(p)) && p !== 창2 && !/GENESIS2|창세기전2/i.test(path.basename(p)));
+  const 창1 = 모두.find(p => /\.(ISO|CUE|IMG)$/.test(이름(p)) && /창세기전1|창세기전 1|GENESIS1|GENESIS\.|창1/i.test(밑(p)) && p !== 창2)
+    || 모두.find(p => /\.(ISO|IMG)$/.test(이름(p)) && p !== 창2 && !/GENESIS2|창세기전2/i.test(밑(p)));
   return { 창2: 창2 || null, 창1: 창1 || null, 모두: 모두.map(p => ({ 이름: path.basename(p), 크기: fs.statSync(p).size })) };
 }
 
@@ -113,8 +115,8 @@ function 큐맞추기(cue, 창1) {
     const 폴더 = path.dirname(cue), 글 = 날.toString(글씨), m = /FILE\s+"([^"]+)"/i.exec(글);
     if (!m) return cue;
     const 이름들 = fs.readdirSync(폴더), 적힌 = path.basename(m[1]);
-    if (이름들.some(n => n.toUpperCase() === 적힌.toUpperCase())) return cue;   /* 있다(대소문자만 달라도 설치엔진이 찾는다) */
-    const 후보 = 이름들.filter(n => /\.(bin|img|iso)$/i.test(n) && path.join(폴더, n) !== 창1 && !/창1|창세기전1|창세기전 1|GENESIS1/i.test(n))
+    if (이름들.some(n => n.normalize('NFC').toUpperCase() === 적힌.normalize('NFC').toUpperCase())) return cue;   /* 애플 NFD 이름도 */   /* 있다(대소문자만 달라도 설치엔진이 찾는다) */
+    const 후보 = 이름들.filter(n => /\.(bin|img|iso)$/i.test(n) && path.join(폴더, n) !== 창1 && !/창1|창세기전1|창세기전 1|GENESIS1/i.test(n.normalize('NFC')))
       .map(n => { let 크기 = 0; try { 크기 = fs.statSync(path.join(폴더, n)).size; } catch (e) { } return { n, 크기 }; }).sort((a, b) => b.크기 - a.크기);
     if (!후보.length) {
       if (fs.existsSync(path.join(폴더, 적힌 + '.받는중'))) throw new Error('CD 이미지(' + 적힌 + ')가 아직 다 올라가지 않았습니다 — 그 파일을 다시 올려 주세요');   /* 올리기 도중 끊김 */
