@@ -11750,9 +11750,19 @@ function 만들기(환경) {
       gl.useProgram(장면복사.prog);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, 장면복사.tex);
       const 뒤집 = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL), 곱 = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, 장면cv);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 뒤집); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 곱);
+      /* [정본 336] 장면 그림이 지난번 올린 뒤로 안 바뀌었으면(번호·크기 같음) 다시 올리지 않는다 — WebGL 그림판을 다른 WebGL 로 옮기면 GPU 되읽기라 한 번 18ms
+       *   (맥 시뮬레이터 아이패드 1-7 3D 가만히 5초 66번 1199ms · 한 장면에 두 번씩 올렸다) · 번호를 안 주는 곳(지정보기)은 예전처럼 매번 */
+      const 판번호 = 환경.장면판번호 ? 환경.장면판번호() : -1;
+      /* 카메라가 그대로면 장면이 바뀌어도(바닥 애니·범위 표식) 0.5초에 한 번만 — 가만히 있어도 장면을 한 번 그릴 때마다 비싼 되읽기가 한 번씩이라(5초 33번 1148ms) · 카메라가 움직이면 매번 */
+      const 캠0 = 환경.카메라(), 캠키 = [캠0.vcx, 캠0.vcy, 캠0.tilt, 캠0.rot, 캠0.zoom, 캠0.dist, 캠0.fov].join(','), 지금 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      const 판바뀜 = 장면복사.올린판 !== 판번호 && (장면복사.올린캠 !== 캠키 || 지금 - (장면복사.올린때 || 0) > 500);
+      if (판번호 < 0 || 판바뀜 || 장면복사.올린w !== 장면cv.width || 장면복사.올린h !== 장면cv.height) {
+        장면복사.올린캠 = 캠키; 장면복사.올린때 = 지금;
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, 장면cv);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 뒤집); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 곱);
+        장면복사.올린판 = 판번호; 장면복사.올린w = 장면cv.width; 장면복사.올린h = 장면cv.height;
+      }
       gl.uniform1i(장면복사.t, 0);
       gl.colorMask(true, true, true, true); gl.disable(gl.DEPTH_TEST);
       gl.stencilMask(0xFF); gl.stencilFunc(gl.EQUAL, 0x80, 0x80); gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
