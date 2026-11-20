@@ -103,7 +103,7 @@ function 낄수있나(c, 코드, 판정칸) {
 
 /* ── 화면 ───────────────────────────────────────────────────────────────── */
 /* ☠ 꼴 글 안에는 큰따옴표를 쓰지 않는다 — style="…" 속성을 끊어 단추가 흰 기본 꼴로 보였다(11-21 화면 찍어 봄) */
-var 단추꼴 = 'font:14px Malgun Gothic,sans-serif;color:#f8e890;background:#4a5e4a;border:2px solid #1c1c1c;padding:5px 12px;cursor:pointer';
+var 단추꼴 = 'font:14px Malgun Gothic,sans-serif;color:#f8e890;background:#4a5e4a;border:2px solid #1c1c1c;padding:5px 12px;cursor:pointer;white-space:nowrap;flex:none';   /* 휴대폰 가로에서 «다시/읽기»로 꺾였다 — 꺾지 않고 띠가 줄어든다 */
 var 칸꼴 = 'background:#0e1410;color:#f0e0a0;border:1px solid #5e7660;font:14px Malgun Gothic,sans-serif;padding:3px 6px;box-sizing:border-box';
 
 function 사람들() {
@@ -141,7 +141,7 @@ function 그리기() {
       '<div style="padding:6px 8px;border-bottom:1px solid #3a4a3a;font-size:12.5px;color:#c8b890">현재 파티(진영 ' + 활동 + ') 소지금<br>' +
         (팀값 ? '<input type="number" data-칸="소지금" value="' + 돈 + '" min="0" max="4294967295" style="' + 칸꼴 + ';width:100%;margin-top:3px">' : '<span style="color:#a8a080">없음</span>') + '</div>' +
       '<div style="flex:1;overflow-y:auto" class="g2에-목">' + 목 + '</div></div>' +
-    '<div style="flex:1;overflow-y:auto;padding:4px 14px 10px" class="g2에-칸들">' + (c ? 칸들(c) : '') + '</div>';
+    '<div style="flex:1;overflow-y:auto;padding:4px 14px 2px;scrollbar-width:none" class="g2에-칸들">' + (c ? 칸들(c) : '') + '</div>';
   Array.prototype.forEach.call(몸.querySelectorAll('[data-코드]'), function (el) {
     el.addEventListener('click', function () { 지금.고른코드 = +el.getAttribute('data-코드'); 그리기(); });
   });
@@ -287,19 +287,21 @@ function 칸들(c) {
   var 마 = c['마법레벨'] || [], 마칸 = function (i) { return '<span style="display:inline-flex;flex-direction:column;align-items:center;margin:0 4px 0 0"><span style="font-size:12px;color:#c8b890">' + 글(마이름[i]) + '</span>' + 작은수('마법:' + i, 마[i] | 0, 한.마법[0], 한.마법[1], 34) + '</span>'; };
   var 마글 = '<div style="display:flex;align-items:center;gap:8px"><div style="color:#f8e890;line-height:1.25;white-space:nowrap">마법<br>문장</div><div style="white-space:nowrap">' + [0, 1, 2, 3, 4, 5, 6].map(마칸).join('') + '</div></div>';
   var 필이름 = ['검', '창', '도끼', '활', '권'], 필 = c['필살기숙련'] || [], 등 = c['필살기클래스등급'] | 0;
-  var 등옵 = [0, 1, 2, 3, 4].map(function (n) { return '<option value="' + n + '"' + (n === 등 ? ' selected' : '') + '>' + n + '</option>'; }).join('');
+  var 등옵 = [0, 1, 2, 3, 4].map(function (n) { return '<option value="' + n + '"' + (n === 등 ? ' selected' : '') + '>' + ({ 0: '0 최상', 4: '4 최하' }[n] || n) + '</option>'; }).join('');
   /* 등급은 제목 줄로 · 상한 설명 뺌 (사장님 11-21 「필살기 상한 설명 지우고 그자리에 등급을 올려줘」) */
-  var 등글 = '<span style="margin-left:10px;color:#c8b890;font-size:13px">등급</span> <select data-칸="필살기등급" style="' + 칸꼴 + ';width:60px">' + 등옵 + '</select> <span style="color:#a8a080;font-size:12px">작을수록 좋음</span>';
-  var 필글 = '<div>' +
-    필이름.map(function (이, i) { return '<span style="display:inline-flex;flex-direction:column;align-items:center;margin:0 6px 4px 0"><span style="font-size:12px;color:#c8b890">' + 이 + '</span>' + 작은수('필살기:' + i, 필[i] | 0, 0, K.필살기한도[i], 44) + '</span>'; }).join('') +
-    '</div>';
+  /* 왼쪽 = «필살기» 아래 등급 고르개 · 오른쪽 = 무기별 다섯 칸 좁혀서 · 설명 뺌 (사장님 11-21 「필살기도 등급을 필살기 아래로 내리고 부가설명 없애고 무기별 필살기는 오르쪽으로 줄여서 배치」) */
+  var 등글 = '<select data-칸="필살기등급" title="등급 — 작을수록 좋음" style="' + 칸꼴 + ';width:78px">' + 등옵 + '</select>';
+  var 필글 = '<div style="display:flex;align-items:center;gap:8px"><div style="display:flex;flex-direction:column;gap:3px;white-space:nowrap"><span style="color:#f8e890">필살기</span>' + 등글 + '</div><div style="white-space:nowrap">' +
+    필이름.map(function (이, i) { return '<span style="display:inline-flex;flex-direction:column;align-items:center;margin:0 4px 0 0"><span style="font-size:12px;color:#c8b890">' + 이 + '</span>' + 작은수('필살기:' + i, 필[i] | 0, 0, K.필살기한도[i], 34) + '</span>'; }).join('') +
+    '</div></div>';
   /* 왼쪽에 캐릭터 정보 · 마법 문장 · 필살기를 쌓는다 — 초상화·스프라이트가 작아 비는 자리 (사장님 11-21 「스프라이트와 포트레이트가 작으니 마법문장과 필살기를 그쪽으로 올려도 좋겠어」) */
-  var 왼 = '<div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:8px">' + 무리('캐릭터 정보', 정보, ';flex:none') + 무리('', 마글, ';flex:none') + 무리('필살기' + 등글, 필글, ';flex:none') + '</div>';
+  var 왼 = '<div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:8px">' + 무리('캐릭터 정보', 정보, ';flex:none') + 무리('', 마글, ';flex:none') + 무리('', 필글, ';flex:none') + '</div>';
   /* 장비 — 가로 다섯 칸 · 아이템 그림 · 무기·방패·장신구는 낄 수 있는 것만 · 보조는 능력치에 안 들어감 */
   var 수 = 아이템수(), eq = c.장비 || {};
   /* 한 줄 — 칸 이름을 그림 왼쪽에 · 그림 24 (사장님 11-21 「아이템이 지금 보기 안좋아. 줄여서 1줄에 넣으면 좋겠어」) */
   /* 가로 한 줄 · 두 칸 아래 화면 폭 전체 (사장님 11-21 「장비를 가로로 바꿔줘. 지금은 세로로 나열되어있어」 · 오른쪽 칸은 다섯을 가로로 놓기엔 좁다) */
-  var 장글 = '<div style="display:flex;gap:10px;flex-wrap:nowrap;align-items:flex-end">' + K.장비칸.map(function (k) {
+  /* «장비» 제목을 왼쪽에 · 다섯 칸은 그 오른쪽에 조금씩 줄여서 (사장님 11-21 「장비도 조금씩 줄여서 제목 오른쪽으로」) */
+  var 장글 = '<div style="display:flex;align-items:center;gap:10px"><div style="color:#f8e890;white-space:nowrap">장비</div><div style="flex:1;min-width:0;display:flex;gap:8px;flex-wrap:nowrap;align-items:flex-end">' + K.장비칸.map(function (k) {
     var 지금코드 = eq[k.열쇠] | 0, 옵 = '<option value="0"' + (지금코드 ? '' : ' selected') + '>없음</option>';
     for (var i = 1; i <= 수; i++) {
       if (i !== 지금코드 && !낄수있나(c, i, k.판정칸)) continue;
@@ -308,11 +310,11 @@ function 칸들(c) {
     var 캔 = 지금코드 && 상.아이템캔 && 상.아이템캔[지금코드 - 1];
     /* 칸마다 위 = 이름·그림 · 아래 = 고르개(폭 전체) — 한 줄이면 이름이 잘렸다 */
     return '<div style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:3px"><span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#c8b890;white-space:nowrap">' +
-      그림(그림주소(캔, '아' + 지금코드), 24) + k.이름 + '</span><select data-칸="장비:' + k.열쇠 + '" style="' + 칸꼴 + ';font-size:13px;padding:2px 3px;width:100%;min-width:0">' + 옵 + '</select></div>';
-  }).join('') + '</div>';
+      그림(그림주소(캔, '아' + 지금코드), 20) + k.이름 + '</span><select data-칸="장비:' + k.열쇠 + '" style="' + 칸꼴 + ';font-size:12.5px;padding:2px 3px;width:100%;min-width:0">' + 옵 + '</select></div>';
+  }).join('') + '</div></div>';
   var 오 = '<div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:8px">' + 무리('', 능, ';flex:none') + '</div>';
   h += 반반(왼, 오);
-  h += 무리('장비', 장글, ';margin:0 0 8px');
+  h += 무리('', 장글, ';margin:0');
   return h;
 }
 
@@ -426,7 +428,16 @@ function 패드(명령) {
 }
 var 키명령 = { ArrowUp: '위', ArrowDown: '아래', ArrowLeft: '왼쪽', ArrowRight: '오른쪽', Enter: '확인', Escape: '취소', PageUp: '이전', PageDown: '다음' };
 
-function 닫기() { if (창 && 창.parentNode) 창.parentNode.removeChild(창); 창 = null; 지금 = null; 옛초점 = null; root.__캐릭터에디터열림 = false; }
+/** 판을 980×720 으로 그려 창에 맞춰 통째로 늘리고 줄인다 — 어느 해상도든 같은 비율 (사장님 11-21 「지금 저 화면 비율대로 다른 데도 들어가면 안되는거야? 해상도 따라 달라?」)
+ *   배율 0.7 아래(휴대폰 가로 등)는 글자가 너무 작아 예전처럼 화면을 채우고 스크롤 · zoom 은 누름 자리도 함께 맞는다(transform 과 달리 자리 계산이 그대로) */
+var 판너비 = 980, 판높이 = 720;
+function 판맞추기() {
+  var 판 = 창 && 창.querySelector('.g2에-판'); if (!판) return;
+  var 배 = Math.min(root.innerWidth * 0.96 / 판너비, root.innerHeight * 0.94 / 판높이, 2);
+  if (배 >= 0.7) { 판.style.width = 판너비 + 'px'; 판.style.height = 판높이 + 'px'; 판.style.zoom = String(배); }
+  else { 판.style.width = 'min(980px,96vw)'; 판.style.height = 'min(720px,94vh)'; 판.style.zoom = ''; }
+}
+function 닫기() { root.removeEventListener('resize', 판맞추기); if (창 && 창.parentNode) 창.parentNode.removeChild(창); 창 = null; 지금 = null; 옛초점 = null; root.__캐릭터에디터열림 = false; }
 function 닫기물음() { if (지금 && 지금.고침수) 물음('저장하지 않은 고침이 있습니다. 버리고 닫을까요?', 닫기); else 닫기(); }
 
 function 열기() {
@@ -437,11 +448,12 @@ function 열기() {
   창.className = 'g2에디터 g2판';
   if (!document.getElementById('g2에디터꼴')) { var 꼴 = document.createElement('style'); 꼴.id = 'g2에디터꼴'; 꼴.textContent = '.g2에디터 :focus{outline:2px solid #f8e890;outline-offset:1px}.g2에디터 [data-코드]:focus{background:#2e3e30}' +
       '.g2에디터 [data-칸^="마법:"],.g2에디터 [data-칸^="필살기:"]{padding-left:4px!important;padding-right:2px!important;text-align:center;-moz-appearance:textfield}.g2에디터 [data-칸^="마법:"]::-webkit-inner-spin-button,.g2에디터 [data-칸^="필살기:"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}' +
+      '.g2에디터 .g2에-칸들::-webkit-scrollbar{display:none}' +
       '.g2에디터 .g2에-몸 input,.g2에디터 .g2에-몸 select{padding-top:1px!important;padding-bottom:1px!important;font-size:13px!important}.g2에디터 .g2에-몸 td{padding-top:1px!important;padding-bottom:1px!important}' +
       '@media (max-height:520px){.g2에디터 .g2에-안내{font-size:11px;line-height:1.35}.g2에디터 .g2에-머리{padding:5px 10px}}';   /* 휴대폰 가로 — 안내·머리를 줄여 고칠 칸 자리를 넓힌다 */ document.head.appendChild(꼴); }   /* g2판 — 휴대폰 터치를 그대로 통과(터치.js 판위) · 목록·스크롤이 손가락으로 된다 */
   창.style.cssText = 'position:fixed;inset:0;z-index:2147482000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font:14px "Malgun Gothic",sans-serif;';
   창.innerHTML =
-    '<div style="background:#1c2620;border:2px solid #7c9478;color:#f0e0a0;width:min(980px,96vw);height:min(720px,94vh);display:flex;flex-direction:column;box-shadow:0 8px 30px #000">' +
+    '<div class="g2에-판" style="background:#1c2620;border:2px solid #7c9478;color:#f0e0a0;width:min(980px,96vw);height:min(720px,94vh);display:flex;flex-direction:column;box-shadow:0 8px 30px #000">' +
       '<div class="g2에-머리" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #3a4a3a;flex-wrap:wrap">' +
         '<div style="font-size:19px">캐릭터 에디터</div><div class="g2에-슬롯" style="display:flex;gap:6px"></div>' +
         '<label style="margin-left:8px;color:#c8b890;font-size:13px"><input type="checkbox" class="g2에-모두"> 파티만</label>' +
@@ -450,7 +462,7 @@ function 열기() {
       '<div class="g2에-몸" style="flex:1;display:flex;min-height:0"></div>' +
       '<div class="g2에-물음" style="display:none;align-items:center;gap:8px;padding:6px 14px;background:#3a2c20;color:#ffd8a0"></div>' +
       '<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid #3a4a3a">' +
-        '<div class="g2에-띠" style="flex:none"></div><div class="g2에-알림" style="flex:1;font-size:13px;color:#ffcf8a;word-break:break-all"></div>' +
+        '<div class="g2에-띠" style="flex:0 1 auto;min-width:0"></div><div class="g2에-알림" style="flex:1;font-size:13px;color:#ffcf8a;word-break:break-all"></div>' +
         '<button class="g2에-다시" style="' + 단추꼴 + '">다시 읽기</button>' +
         '<button class="g2에-저장" style="' + 단추꼴 + '" disabled>저장</button>' +
         '<button class="g2에-닫기" style="' + 단추꼴 + '">닫기 (Esc)</button></div>' +
@@ -479,6 +491,7 @@ function 열기() {
     }, function (e) { 알림('저장하지 못했습니다 — ' + (e && e.message || e), true); });
   };
   document.body.appendChild(창);
+  판맞추기(); root.addEventListener('resize', 판맞추기);
   그리기();
   슬롯목록().then(function (목) {
     목록캐시 = 목; 슬롯단추들(); 초점(창.querySelector('[data-슬롯]:not([disabled])'));
