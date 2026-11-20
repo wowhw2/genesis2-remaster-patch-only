@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>창세기전 2 리마스터 — 설치</title>
+<!-- 설치 화면 — 원본 INSTALL.EXE(창2 CD 루트)와 같은 꼴 (2026-11-09)
+     사장님 「이왕이면 창2 인스톨 화면과 유사하게 만들어주면 좋겠고..」
+     원본 화면(원본 대조 js-dos ?설치=1 로 찍음): AN02.PCX 대리석 배경 · 노란 한글
+       ① 「아래의 디렉토리로 창세기전2를 / 인스톨 할까요?」 + 경로(작은 영문 흰 글자) + 「예」「아니오」 단추
+       ② 「하드에 창세기전2를 인스톨합니다.」
+     배경·글꼴은 사용자가 고른 CD 에서 읽는다(실행기에 담지 않는다) — CD 를 고르기 전 첫 화면만 우리 글꼴 -->
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; user-select: none; }
+  #판 { position: absolute; image-rendering: pixelated; }
+  #첫, #창1첫 { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+        color: #f0e0a0; font: 18px "Malgun Gothic", sans-serif; text-align: center; }
+  #첫 h1, #창1첫 h1 { font-size: 30px; margin: 0 0 10px; letter-spacing: 2px; }
+  #첫 .설명, #창1첫 .설명 { color: #b8a878; font-size: 15px; line-height: 1.6; }
+  #첫 button, #창1첫 button { font: 17px "Malgun Gothic", sans-serif; color: #f8e890; background: #4a5e4a; border: 2px solid #1c1c1c;
+               padding: 10px 26px; min-width: 260px; cursor: pointer; }
+  #첫 button:hover, #창1첫 button:hover { background: #5c745c; }
+  #첫 .오류, #창1첫 .오류 { color: #ff8a70; min-height: 22px; font-size: 15px; }
+  /* 정본 273 — 릴리즈노트 상자 (스크롤) */
+  .노트 { width: min(860px, 90vw); height: 34vh; overflow-y: auto; text-align: left; white-space: pre-wrap; box-sizing: border-box;
+          padding: 12px 16px; background: rgba(20, 24, 20, 0.85); border: 2px solid #3a4a3a; color: #d8ccb0; font: 14px/1.55 "Malgun Gothic", sans-serif; }
+  .노트:empty { display: none; }
+  /* 정본 310 — 이미 설치돼 있을 때 첫 화면(«바로 시작» / «다시 설치») */
+  #설치됨 { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+            color: #f0e0a0; font: 18px "Malgun Gothic", sans-serif; text-align: center; }
+  #설치됨 h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: 2px; }
+  #설치됨 .설명 { color: #b8a878; font-size: 15px; line-height: 1.6; }
+  #설치됨 .경로 { color: #e8e8e8; font-size: 13px; line-height: 1.5; word-break: break-all; max-width: min(860px, 90vw); }
+  #설치됨 button { font: 17px "Malgun Gothic", sans-serif; color: #f8e890; background: #4a5e4a; border: 2px solid #1c1c1c;
+                   padding: 10px 26px; min-width: 300px; cursor: pointer; }
+  #설치됨 button:hover { background: #5c745c; }
+  #설치됨 .오류 { color: #ff8a70; min-height: 22px; font-size: 15px; }
+  #설치됨 .새소식 { height: auto; max-height: 22vh; border-color: #6a7a4a; color: #f0e0a0; }
+  #설치됨 .노트:not(.새소식) { height: 22vh; }
+  /* 정본 313 — «새 패치가 있습니다 — 패치 받기» 줄 */
+  #패치줄 { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 18px; border: 2px solid #6a7a4a; background: rgba(40, 52, 32, 0.85); }
+  #패치말 { color: #f8e890; font-size: 16px; max-width: min(860px, 90vw); }
+  #패치막대 { width: 300px; height: 10px; background: #222; border: 1px solid #555; }
+  #패치막대 > div { height: 100%; width: 0; background: #c8a848; }
+  button:focus { outline: 2px solid #f8e890; outline-offset: 2px; }   /* 키보드·패드로 고른 단추 */
+</style>
+</head>
+<body>
+<canvas id="판" width="320" height="200" style="display:none"></canvas>
+<div id="첫">
+  <h1>창세기전 2 리마스터</h1>
+  <div class="설명">원본 창세기전2 CD 를 골라 주세요 — CD 이미지(.cue · .bin · .iso) 또는 CD 를 꽂은 드라이브.<br>이미 설치해 둔 원본 폴더가 있으면 그 폴더를 골라도 됩니다.</div>
+  <button id="CD고르기">CD 이미지 고르기</button>
+  <button id="드라이브고르기">CD 드라이브 고르기</button>
+  <button id="폴더고르기">설치된 폴더 고르기</button>
+  <div class="오류" id="첫오류"></div>
+  <div class="노트" id="첫노트"></div>
+</div>
+<!-- 창세기전 1 원본 — 꼭 필요하다 (사장님 11-09 「창1도 반드시 필요해. 용자의무덤, HGS 및 각종 스프라이트 등을 창1없이 하려면 각각 대체할 수 있는게 필요해서 어려워.」) -->
+<div id="창1첫" style="display:none">
+  <h1>창세기전 1 원본</h1>
+  <div class="설명">창세기전 2 리마스터는 창세기전 1 원본이 꼭 있어야 합니다.<br>용자의 무덤 지도, 창세기전 1 음악, 창세기전 1 에서 온 캐릭터 그림을 여기서 만듭니다.<br>창세기전 1 CD 이미지나 설치 폴더를 골라 주세요.</div>
+  <button id="창1CD고르기">창세기전 1 CD 이미지 고르기</button>
+  <button id="창1폴더고르기">창세기전 1 설치 폴더 고르기</button>
+  <div class="오류" id="창1오류"></div>
+  <div class="노트" id="창1노트"></div>
+</div>
+<!-- 정본 310 — 이미 설치돼 있을 때 첫 화면 (사장님 11-20 「차라리 첫화면을 그대로 두고 이미 설치된 경우 다시 설치하거나 바로 시작을 선택할 수 있도록 하는게 어때?」
+     · 「그리고 릴리즈노트는 해당 화면에 띄우면 되는거 아니야?」) — 판 번호·«배포 후 버그 수정»을 위 상자에 먼저, 그 아래 노트 전체 -->
+<div id="설치됨" style="display:none">
+  <h1>창세기전 2 리마스터</h1>
+  <div class="설명" id="설치됨말">이미 설치되어 있습니다.</div>
+  <div class="경로" id="설치됨경로"></div>
+  <!-- 정본 313 — 새 패치가 있으면 «바로 시작» 위에 (사장님 11-20 「혹시 매번 새로 받아서 설치하는 방식 말고 패치형태로는 어려워?」) · 인터넷이 안 되거나 답이 늦으면 안 보인다 -->
+  <div id="패치줄" style="display:none">
+    <div id="패치말"></div>
+    <button id="패치받기">패치 받기</button>
+    <!-- 정본 329 — 새로 설치해야 하는 판이면 내려받기 페이지(구글 드라이브 공개 폴더)로 바로 (사장님 11-20 「그리고 지금 새로 받으라는 안내는 링크도 함께 넣어줘.」·「누르면 바로 다운로드 페이지로 가게」)
+         · 새 창 열기는 앱 main.js 가 기본 브라우저로 넘긴다(setWindowOpenHandler · 그 전 판 앱은 앱 안 새 창) -->
+    <a id="새판받기" href="https://drive.google.com/drive/folders/1ciVwj-ZQwKllIVtUhS_xsmzqlCbU52-B?usp=drive_link" target="_blank" rel="noopener" style="display:none;font:17px 'Malgun Gothic',sans-serif;color:#f8e890;background:#4a5e4a;border:2px solid #1c1c1c;padding:10px 26px;min-width:260px;text-decoration:none">내려받기 페이지 열기</a>
+    <div id="패치막대" style="display:none"><div></div></div>
+  </div>
+  <button id="바로시작">바로 시작</button>
+  <button id="다시설치">다시 설치 (원본 다시 고르기)</button>
+  <button id="다시예" style="display:none">예 — 원본을 다시 고릅니다</button>
+  <button id="다시아니오" style="display:none">아니오</button>
+  <div class="오류" id="설치됨오류"></div>
+  <div class="노트 새소식" id="설치됨새소식"></div>
+  <div class="노트" id="설치됨노트"></div>
+</div>
+<script src="../게임/js/native.js"></script>
+<script>
+'use strict';
+var 창구 = window.설치창구, N = window.G2Native;
+/* 정본 273 — 릴리즈노트를 두 고르기 화면 아래 상자에 */
+if (창구 && 창구.릴리즈노트) 창구.릴리즈노트().then(function (t) {
+  ['첫노트', '창1노트'].forEach(function (id) { var e = document.getElementById(id); if (e) e.textContent = t || ''; });
+  var 설노 = document.getElementById('설치됨노트'); if (설노) 설노.textContent = 실행기설명(t || '');   /* 정본 325 — 아래는 실행기 설명부터 */
+  var 새 = document.getElementById('설치됨새소식'); if (새) 새.textContent = 새소식(t || '');   /* 정본 310 — 판 번호 + «7. 배포 후 버그 수정» 을 먼저 */
+}).catch(function () {});
+/* 릴리즈노트에서 «판 …» 줄과 «패치 내역» 절만 떼어 낸다 (모바일 설치.html 과 같은 함수 · 시험 install_reselect_310)
+ *   패치 내역은 11-20 부터 맨 위 «1. 패치 내역» (사장님 「그리고 패치 사항은 맨 위에 올라오는게 좋겠어」) · 옛 제목 «배포 후 버그 수정» 도 받는다 */
+function 새소식(t) {
+  var 판 = (/^판 .*$/m.exec(t) || [''])[0], i = t.search(/^\d+\. (패치 내역|배포 후 버그 수정)/m), 절 = '';
+  if (i >= 0) { var 뒤 = t.slice(i), 끝 = 뒤.search(/\n─+\n\d+\. /); 절 = (끝 > 0 ? 뒤.slice(0, 끝) : 뒤).replace(/\n─+\n/, '\n').trim(); }
+  return (판 + '\n\n' + 절).trim();
+}
+/* 정본 325 — 설치된 화면의 아래 노트는 «N. 이 실행기는» 절부터 (패치 내역은 위 새소식 칸에 이미 있다 · 사장님 11-20 「그리고 실행할때 패치노트칸이 위쪽에 따로 있어서 아래쪽은 그냥 실행기 설명부터 나와도 되겠어.」)
+ *   그 절을 못 찾으면(옛 노트) 전체 · 처음 설치 화면(첫노트·창1노트)은 위 칸이 없으니 전체 그대로 */
+function 실행기설명(t) {
+  var i = t.search(/^\d+\. 이 실행기는/m); if (i < 0) return t;
+  var 앞 = t.lastIndexOf('\n', i - 2), 줄 = t.slice(앞 + 1, i - 1);
+  return (/^─+$/.test(줄) ? t.slice(앞 + 1) : t.slice(i)).replace(/^\s+/, '');
+}
+/* 정본 310 — 키보드(방향키·Enter)·패드(십자·스틱 위아래 · ✕/○ 누르기)로 보이는 단추를 고른다 */
+function 보이는단추() { return [].slice.call(document.querySelectorAll('button')).filter(function (b) { return b.offsetParent !== null && !b.disabled; }); }
+function 단추옮기기(d) { var bs = 보이는단추(); if (!bs.length) return; var i = bs.indexOf(document.activeElement); bs[i < 0 ? 0 : (i + d + bs.length) % bs.length].focus(); }
+function 단추누르기() { var bs = 보이는단추(); if (bs.indexOf(document.activeElement) >= 0) document.activeElement.click(); else if (bs.length) bs[0].focus(); }
+addEventListener('keydown', function (e) {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { 단추옮기기(1); e.preventDefault(); }
+  else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { 단추옮기기(-1); e.preventDefault(); }
+  else if (e.key === 'Enter' && 보이는단추().indexOf(document.activeElement) < 0) { 단추누르기(); e.preventDefault(); }
+});
+(function () {
+  var 전 = {};
+  (function 살피기() {
+    var ps = navigator.getGamepads ? navigator.getGamepads() : [], 지금 = {};
+    for (var k = 0; k < ps.length; k++) { var p = ps[k]; if (!p) continue;
+      var 눌 = function (n) { return !!(p.buttons[n] && p.buttons[n].pressed); }, y = p.axes[1] || 0;
+      지금.아래 = 지금.아래 || 눌(13) || 눌(15) || y > 0.6; 지금.위 = 지금.위 || 눌(12) || 눌(14) || y < -0.6; 지금.누름 = 지금.누름 || 눌(0) || 눌(1); }
+    if (지금.아래 && !전.아래) 단추옮기기(1);
+    if (지금.위 && !전.위) 단추옮기기(-1);
+    if (지금.누름 && !전.누름) 단추누르기();
+    전 = 지금; requestAnimationFrame(살피기);
+  })();
+})();
+var 판 = document.getElementById('판'), g = 판.getContext('2d');
+var 배경 = null, 글꼴 = null, 단추들 = [], 지금 = null;
+var 노랑 = [248, 232, 144], 테 = [40, 28, 16], 흰 = [232, 232, 232];
+
+function 맞추기() {   /* 320×200 을 창에 정수배로 · 가운데 */
+  var k = Math.max(1, Math.floor(Math.min(innerWidth / 320, innerHeight / 200)));
+  판.style.width = (320 * k) + 'px'; 판.style.height = (200 * k) + 'px';
+  판.style.left = ((innerWidth - 320 * k) / 2) + 'px'; 판.style.top = ((innerHeight - 200 * k) / 2) + 'px';
+}
+addEventListener('resize', 맞추기);
+function 바이트(b64) { var s = atob(b64), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+function 글(s, x, y, 색) {   /* 노란 한글 + 어두운 테두리 (원본 화면과 같은 꼴) */
+  [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]].forEach(function (d) { N.drawText(g, 글꼴, s, x + d[0], y + d[1], 테); });
+  N.drawText(g, 글꼴, s, x, y, 색 || 노랑);
+}
+function 단추(이름, x, y, w, h, 할일) {
+  g.fillStyle = '#1c1c1c'; g.fillRect(x, y, w, h);
+  g.fillStyle = '#7c9478'; g.fillRect(x + 1, y + 1, w - 2, h - 2);
+  g.fillStyle = '#5e7660'; g.fillRect(x + 1, y + h - 3, w - 2, 2);
+  var 폭 = 이름.length * 16; 글(이름, x + Math.round((w - 폭) / 2), y + Math.round((h - 16) / 2));
+  단추들.push({ x: x, y: y, w: w, h: h, 할일: 할일 });
+}
+판.addEventListener('click', function (ev) {
+  var r = 판.getBoundingClientRect(), x = (ev.clientX - r.left) * 320 / r.width, y = (ev.clientY - r.top) * 200 / r.height;
+  for (var i = 0; i < 단추들.length; i++) { var b = 단추들[i]; if (x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h) { b.할일(); return; } }
+});
+function 바탕() { 단추들 = []; g.drawImage(배경, 0, 0); }
+function 줄인경로(p) { p = String(p); return p.length > 26 ? p.slice(0, 3) + '..' + p.slice(-21) : p; }   /* x 55~265 에 8px 글자 26자 */
+
+/* ① 「아래의 디렉토리로 창세기전2를 인스톨 할까요?」 */
+function 물음화면(cd, 대상) {
+  바탕();
+  글('아래의 디렉토리로 창세기전2를', 45, 55);
+  글('인스톨 할까요?', 45, 75);
+  N.drawText(g, 글꼴, 줄인경로(대상).toUpperCase(), 55, 113, 흰);
+  /* [리마스터] 설치 경로 바꾸기 — 사장님 11-09 「원본 설치 경로를 지정할 수 있어야해.」 · 고른 폴더 아래 GENESIS2 (원본 기본값 C:\GENESIS2 와 같은 꼴) */
+  단추('바꾸기', 200, 128, 64, 20, function () {
+    창구.고르기('설치위치').then(function (d) {
+      if (!d) return;
+      var 구분 = d.indexOf('/') >= 0 ? '/' : String.fromCharCode(92), 끝 = d.replace(/[\\\/]+$/, '');
+      물음화면(cd, /[\\\/]GENESIS2$/i.test(끝) ? 끝 : 끝 + 구분 + 'GENESIS2');
+    });
+  });
+  단추('예', 85, 157, 57, 20, function () { 설치화면(cd, 대상); });
+  단추('아니오', 187, 157, 58, 20, function () { 첫화면(); });
+}
+/* ② 「하드에 창세기전2를 인스톨합니다.」 + 진행(리마스터 덧 — 원본은 글만) */
+function 설치화면(cd, 대상) {
+  바탕();
+  글('하드에 창세기전2를 인스톨합니다.', 45, 65);
+  var 막대 = function (p) {
+    g.drawImage(배경, 40, 110, 240, 30, 40, 110, 240, 30);
+    var 몫 = p && p.전체 ? p.지금 / p.전체 : 0, 단계 = { 읽기: '읽는 중', 풀기: '압축 푸는 중', 복사: 'CD 에서 옮기는 중', 파생: '그림 만드는 중' }[p && p.단계] || '';
+    g.fillStyle = '#1c1c1c'; g.fillRect(60, 118, 200, 8); g.fillStyle = '#c8b060'; g.fillRect(61, 119, Math.round(198 * 몫), 6);
+    N.drawText(g, 글꼴, 단계 + ' ' + Math.round(몫 * 100) + '%', 60, 128, 흰);
+  };
+  창구.진행(막대); 막대(null);
+  창구.설치({ cd: cd, 대상: 대상 }).then(function () { 창1화면(); }, function (e) { 오류화면(e); });
+}
+/* ③ 창1 원본(꼭 필요) — 용자의 무덤 맵 · 창1 음악 · 창1 그림 · 건너뛰기 없음
+ *   (사장님 11-09 「창1도 반드시 필요해. 용자의무덤, HGS 및 각종 스프라이트 등을 창1없이 하려면 각각 대체할 수 있는게 필요해서 어려워.」) */
+function 창1화면() {
+  판.style.display = 'none'; document.getElementById('첫').style.display = 'none';
+  document.getElementById('창1첫').style.display = '';
+}
+function 창1고르기(종류) {
+  var 오류 = document.getElementById('창1오류'); 오류.textContent = '';
+  창구.고르기(종류).then(function (p) {
+    if (!p) return;
+    오류.textContent = '창세기전 1 자료를 옮기는 중…';
+    return 창구.창1(p).then(function () { 오류.textContent = '다 됐습니다 — 게임을 시작합니다.'; return 창구.시작(); });
+  }).catch(function (e) { 오류.textContent = String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''); });
+}
+document.getElementById('창1CD고르기').onclick = function () { 창1고르기('창1CD'); };
+document.getElementById('창1폴더고르기').onclick = function () { 창1고르기('창1폴더'); };
+function 오류화면(e) { 바탕(); 글('설치하지 못했습니다.', 45, 60); N.drawText(g, 글꼴, String(e && e.message || e).slice(0, 38), 45, 100, 흰); 단추('예', 131, 157, 57, 20, function () { 첫화면(); }); }
+
+/* 첫 화면 — CD 를 고르기 전(원본 그림이 아직 없다) */
+function 첫화면() {
+  판.style.display = 'none'; document.getElementById('첫').style.display = '';
+}
+function CD로(종류) {
+  var 오류 = document.getElementById('첫오류'); 오류.textContent = '';
+  창구.고르기(종류).then(function (cd) {
+    if (!cd) return;
+    오류.textContent = 'CD 를 읽는 중…';
+    return 창구.CD그림(cd).then(function (r) {
+      글꼴 = { newhan: N.decodeNewhan(바이트(r['NEWHAN.FNT'])), newascii: N.decodeNewascii(바이트(r['NEWASCII.FNT'])) };
+      배경 = N.pcxToCanvas(N.decodePcx(바이트(r['AN02.PCX'])));
+      document.getElementById('첫').style.display = 'none'; 판.style.display = ''; 맞추기();
+      return 창구.상태().then(function (s) { 물음화면(cd, s.기본설치경로); });
+    });
+  }).catch(function (e) { 오류.textContent = String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''); });
+}
+document.getElementById('CD고르기').onclick = function () { CD로('CD'); };
+document.getElementById('드라이브고르기').onclick = function () { CD로('CD폴더'); };
+document.getElementById('폴더고르기').onclick = function () {
+  var 오류 = document.getElementById('첫오류'); 오류.textContent = '';
+  창구.고르기('폴더').then(function (d) {
+    if (!d) return;
+    오류.textContent = '확인하는 중…';
+    return 창구.폴더로({ 폴더: d }).then(function () { 오류.textContent = ''; 창1화면(); });   /* 창1 원본은 꼭 — 폴더 길도 묻는다 */
+  }).catch(function (e) { 오류.textContent = String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''); });
+};
+/* 정본 310 — 이미 설치돼 있을 때 첫 화면: «바로 시작»(지금처럼 게임으로) / «다시 설치»(확인 → 설치기록·GENESIS2·파생만 지우고 원본 고르기 첫 화면으로) */
+function 설치됨화면() {
+  판.style.display = 'none'; document.getElementById('첫').style.display = 'none'; document.getElementById('창1첫').style.display = 'none';
+  document.getElementById('설치됨').style.display = '';
+  다시물음(false);
+  창구.상태().then(function (s) {
+    var r = s.기록 || {}, 줄 = [];
+    줄.push('창세기전 2 원본 : ' + (r.CD || r.창2 || '—'));
+    줄.push('창세기전 1 원본 : ' + (r.창1 || '—'));
+    document.getElementById('설치됨경로').textContent = 줄.join('\n');
+    document.getElementById('설치됨경로').style.whiteSpace = 'pre-line';
+  }).catch(function () {});
+  document.getElementById('바로시작').focus();
+  패치살피기();
+}
+/* 정본 313 — 새 패치 확인 · 받기 (main.js 패치확인·패치받기 · 게임/패치받기.js) */
+function 크기글(n) { n = +n || 0; return n >= 1048576 ? (n / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1024)) + 'KB'; }
+function 패치살피기() {
+  var 줄 = document.getElementById('패치줄'), 말 = document.getElementById('패치말'), 단 = document.getElementById('패치받기');
+  줄.style.display = 'none';
+  if (!창구 || !창구.패치확인) return;
+  var 늦음 = false, 타 = setTimeout(function () { 늦음 = true; }, 8000);   /* 몇 초 안에 답이 없으면 숨긴 채로 */
+  창구.패치확인().then(function (r) {
+    clearTimeout(타); if (늦음 || !r) return;
+    if (r.엔진옛것 || r.엔진다름) {
+      말.textContent = '새 판 ' + r.판 + ' 이 나왔습니다 — 이 판은 패치로 바꿀 수 없습니다. 아래 «내려받기 페이지 열기»를 눌러 새 판을 받아 설치해 주세요. 세이브는 그대로 남습니다.';
+      단.style.display = 'none'; document.getElementById('새판받기').style.display = ''; 줄.style.display = ''; return;   /* 정본 329 */
+    }
+    if (!r.있음) return;
+    말.textContent = '새 패치 ' + r.판 + ' 가 있습니다 (지금 ' + (r.지금판 || '—') + ' · 받을 것 ' + 크기글(r.크기) + ')';
+    단.style.display = ''; 단.disabled = false; 줄.style.display = '';
+  }).catch(function () { clearTimeout(타); });   /* 인터넷이 안 되면 조용히 */
+}
+document.getElementById('패치받기').onclick = function () {
+  var 말 = document.getElementById('패치말'), 단 = this, 막 = document.getElementById('패치막대');
+  단.disabled = true; 막.style.display = ''; 말.textContent = '패치를 받는 중…';
+  ['바로시작', '다시설치'].forEach(function (id) { document.getElementById(id).disabled = true; });
+  창구.패치진행(function (p) {
+    막.firstChild.style.width = (p && p.전체 ? Math.round(p.지금 / p.전체 * 100) : (p && p.단계 === '끝' ? 100 : 0)) + '%';
+    if (p && p.단계 === '받기') 말.textContent = '패치를 받는 중… ' + 크기글(p.지금) + ' / ' + 크기글(p.전체);
+    else if (p && p.단계 === '바꿈') 말.textContent = '받은 파일을 바꿔 넣는 중…';
+  });
+  var 풀기 = function () { ['바로시작', '다시설치'].forEach(function (id) { document.getElementById(id).disabled = false; }); };
+  창구.패치받기().then(function (r) {
+    풀기(); 단.style.display = 'none'; 막.firstChild.style.width = '100%';
+    말.textContent = '패치 ' + r.판 + ' 를 받았습니다 — «바로 시작» 을 누르세요.';
+    document.getElementById('바로시작').focus();
+    창구.릴리즈노트().then(function (t) {   /* 받은 패치의 릴리즈노트로 다시 */
+      document.getElementById('설치됨노트').textContent = 실행기설명(t || '');   /* 정본 325 */
+      document.getElementById('설치됨새소식').textContent = 새소식(t || '');
+    }).catch(function () {});
+  }).catch(function (e) {
+    풀기(); 단.disabled = false; 막.style.display = 'none';
+    말.textContent = '패치를 받지 못했습니다 — ' + String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  });
+};
+function 다시물음(켬) {   /* «다시 설치» 를 누르면 같은 자리에서 한 번 더 묻는다 */
+  document.getElementById('설치됨말').textContent = 켬
+    ? '원본을 다시 고릅니다. 세이브와 게임 설정은 그대로 남고, 설치해 둔 원본 사본과 그림 자료만 지웁니다. 다시 설치할까요?'
+    : '이미 설치되어 있습니다. 원본을 잘못 골랐다면 «다시 설치»로 다시 고를 수 있습니다 — 세이브는 남습니다.';
+  ['바로시작', '다시설치'].forEach(function (id) { document.getElementById(id).style.display = 켬 ? 'none' : ''; });
+  ['다시예', '다시아니오'].forEach(function (id) { document.getElementById(id).style.display = 켬 ? '' : 'none'; });
+  document.getElementById(켬 ? '다시아니오' : '다시설치').focus();
+}
+document.getElementById('바로시작').onclick = function () {
+  var 오류 = document.getElementById('설치됨오류'); 오류.textContent = '게임을 시작합니다…';
+  창구.시작().catch(function (e) { 오류.textContent = String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''); });
+};
+document.getElementById('다시설치').onclick = function () { document.getElementById('설치됨오류').textContent = ''; 다시물음(true); };
+document.getElementById('다시아니오').onclick = function () { 다시물음(false); };
+document.getElementById('다시예').onclick = function () {
+  var 오류 = document.getElementById('설치됨오류'); 오류.textContent = '지우는 중…';
+  창구.다시설치().then(function () {
+    오류.textContent = '';
+    document.getElementById('설치됨').style.display = 'none'; 첫화면();
+    document.getElementById('CD고르기').focus();
+  }).catch(function (e) { 오류.textContent = String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''); });
+};
+맞추기();
+/* 앱이 «창2 는 설치됐는데 창1 원본이 없다»로 열면 곧바로 창1 단계 (main.js whenReady) */
+if (/[?&]단계=창1/.test(decodeURIComponent(location.search))) 창1화면();
+/* 정본 310 — 이미 설치돼 있으면 «바로 시작» / «다시 설치» (main.js whenReady 가 ?단계=설치됨 으로 연다) */
+else if (/[?&]단계=설치됨/.test(decodeURIComponent(location.search))) 설치됨화면();
+</script>
+</body>
+</html>
