@@ -1,6 +1,6 @@
 {
- "판": "R0.1.36",
- "만든때": "2026-11-20T16:50:50.280Z",
+ "판": "R0.1.37",
+ "만든때": "2026-11-20T18:42:25.437Z",
  "파일": [
   {
    "경로": "게임/js/battle_stage.js",
@@ -13,14 +13,34 @@
    "크기": 20139
   },
   {
+   "경로": "게임/js/char_editor.js",
+   "sha256": "c9cf0824f444bcdc774a28cceee427d1eb6f38f209d3fda5e983d1602b6b6d99",
+   "크기": 44306
+  },
+  {
+   "경로": "게임/js/char_editor_calc.js",
+   "sha256": "4a0a6ccc7720d4bee626a4400e95aafbe579eaa062ad8771bb44a3d142d491ef",
+   "크기": 16847
+  },
+  {
+   "경로": "게임/js/game_settings.js",
+   "sha256": "58db3186ea4943dc4bc5cb442a23521ddcc2b49b7a387b90ea605c09a233449e",
+   "크기": 69589
+  },
+  {
    "경로": "게임/js/jobstats.js",
    "sha256": "cbfb7c83c52f3a6d97fa8f3f0ca0873fc40eac5cae708832650673bdef8a044d",
    "크기": 17973
   },
   {
    "경로": "게임/js/native.js",
-   "sha256": "a0be98ccb207372a386e2b03b1c17bbde69a5f1e481d47d44e7f7d89781ecbda",
-   "크기": 170485
+   "sha256": "2fc50fae46e8ef683b4d0a67d7e51143598d713d7c297910c3870f06648c0fb1",
+   "크기": 170575
+  },
+  {
+   "경로": "게임/js/pad_input.js",
+   "sha256": "70c4680a98b65592e4bf82365e52a9f9d97cfb2f6e16b353c5e79cf52ee1dd67",
+   "크기": 100139
   },
   {
    "경로": "게임/js/render.js",
@@ -34,7 +54,7 @@
   },
   {
    "경로": "게임/js/screens.js",
-   "sha256": "916c62e8f0d2ac67f4f2bdfdff8eadba74a4da4a5e0ed48352c8571999d3e32c",
+   "sha256": "a71013f3de5874fffec43e4bf708af42bec13ebaaf562c3e509141b9d842a7c4",
    "크기": 1044521
   },
   {
@@ -59,13 +79,13 @@
   },
   {
    "경로": "게임/게임.html",
-   "sha256": "604d738d6111a3163c92e485af0cb3a795010c069f657b8971250f8319e61be1",
-   "크기": 940770
+   "sha256": "71fe3289fe461aea4f5488809b24f2d0ac689ad24086452d899c2a95fe7a0bf2",
+   "크기": 941005
   },
   {
    "경로": "게임/릴리즈노트.txt",
-   "sha256": "e2f8be5fbe5b7e72d4512b4ba81adcb86efb576a4d5328b613dbbed0bdb8229e",
-   "크기": 16302
+   "sha256": "e57f9bd554241e3c0e615ab82f1d0e149ccfaa5bd24e895bf53ff16852061035",
+   "크기": 16474
   },
   {
    "경로": "설치/모바일.html",
