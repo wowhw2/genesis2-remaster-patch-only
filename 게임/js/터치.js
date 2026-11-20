@@ -220,6 +220,9 @@
     var 왼판 = document.getElementById('가상왼'), 여백 = 왼판 ? (parseFloat(getComputedStyle(왼판).left) || 8) - 8 : 0;
     띠 -= Math.max(0, 여백);
     var 칸w = Math.max(34, Math.min(56, Math.floor((띠 - 12 - 8) / 3)));
+    /* 정본 340 — 아이패드처럼 4:3 에 가까운 화면은 옆 띠가 거의 없어 늘 가장 작은 34px 가 됐다(아이패드 미니 흉내: 창 1133×744 → 칸 34 · 사장님 신고 «2초정도뒤에 매우 작아짐»)
+     *   ⇒ 띠로 잰 칸이 44px(손가락 최소) 보다 작으면 게임 화면 가장자리에 겹쳐 큰 칸(56)을 쓴다 — 아래 세로 제한은 그대로 · 휴대폰(옆 띠 넓음)은 그대로 */
+    if (Math.floor((띠 - 12 - 8) / 3) < 44) 칸w = 56;
     /* 세로도 — 단추 줄(0.8 + 3칸) + 스틱(2.2칸) + 틈이 화면 높이에 들어가게 (정본 303 스틱 더함) */
     칸w = Math.max(30, Math.min(칸w, Math.floor((innerHeight - 20 - 14 - 24) / 6)));
     document.documentElement.style.setProperty('--g2칸', 칸w + 'px');
