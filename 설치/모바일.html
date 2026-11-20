@@ -27,9 +27,9 @@
   .막대 { height: 14px; background: #222; border: 1px solid #555; margin-top: 8px; }
   .막대 > div { height: 100%; width: 0; background: #c8a848; }
   .오류 { color: #ff8a70; min-height: 20px; font-size: 14px; }
-  .노트 { height: 30vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; white-space: pre-wrap; font-size: 13px; color: #d8ccb0; }   /* 칸마다 따로 스크롤 — 위 새소식 칸·아래 노트 칸 (정본 326 · 사장님 「각 영역별로 스크롤이 되어야 할 것 같은데」) */
+  .노트 { white-space: pre-wrap; font-size: 13px; color: #d8ccb0; }   /* 정본 330 — 칸 안 스크롤 없음 · 내용 길이만큼 늘고 화면 전체(.판) 하나로만 스크롤 (사장님 11-20 「…각 영역 사이의 좁은 부분을 잡고 끌어야하는데 이거 좀 조정하는게 낫지 않을까?」) · 처음 정본 326 은 칸마다 따로였다 */
   .노트:empty { display: none; }
-  .새소식 { height: auto; max-height: 30vh; color: #f0e0a0; border-color: #6a7a4a; }   /* 정본 310 — 판 번호 + «배포 후 버그 수정» 을 먼저 */
+  .새소식 { color: #f0e0a0; border-color: #6a7a4a; }   /* 정본 310 — 판 번호 + 패치 내역을 먼저 · 정본 330 — 높이 제한 없음 */
   button:focus, label.단추:focus { outline: 2px solid #f8e890; outline-offset: 2px; }   /* 키보드·패드로 고른 단추 */
 </style>
 </head>

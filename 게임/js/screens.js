@@ -34,7 +34,7 @@
  * ============================================================ */
 'use strict';
 (function (root) {
-  var 리마스터판 = 'R0.1.11';   /* ★ 리마스터 판 번호 — 시작화면 왼쪽 아래 · 릴리즈노트.txt 머리 «판 R0.1.0» 과 함께 바꾼다 (정본 275) */
+  var 리마스터판 = 'R0.1.12';   /* ★ 리마스터 판 번호 — 시작화면 왼쪽 아래 · 릴리즈노트.txt 머리 «판 R0.1.0» 과 함께 바꾼다 (정본 275) */
 
   var SH = root.G2Shell || (typeof require === 'function' ? require('./shell.js') : null);
   var BB = root.G2Blackbox || (typeof require === 'function' ? require('./blackbox.js') : null);
