@@ -1,0 +1,189 @@
+{
+ "판": "R0.1.2",
+ "만든때": "2026-11-20T08:43:37.947Z",
+ "파일": [],
+ "엔진": [
+  {
+   "경로": "게임/js/asset_ref.js",
+   "sha256": "00fe2a03721ecc6c529ba8e896d3204ecd09b8dc210a288fbdca8235757ff931",
+   "크기": 937
+  },
+  {
+   "경로": "게임/js/map3d_surface_store.js",
+   "sha256": "349ee3e4f10da0b98a3152e4fd91a588bf98c6751d31c0a96e351530a21bae61",
+   "크기": 9218
+  },
+  {
+   "경로": "게임/js/map3d_terrain_preview.js",
+   "sha256": "315f569004325943a2350e29183acd813f634e161d7e827dda08ba3b1ff7e34f",
+   "크기": 12019
+  },
+  {
+   "경로": "게임/js/map3d_u_catalog.js",
+   "sha256": "3b510f2ba87a49bdf0a73287c03dec63b8c806981cdc31b803ddecdf6bae74b4",
+   "크기": 7355
+  },
+  {
+   "경로": "게임/js/map3d_u_write_gate.js",
+   "sha256": "2c77a938dcfbd3474d2952e2c83b753f5d0b4850fe2608ff5498a3741095e125",
+   "크기": 6636
+  },
+  {
+   "경로": "게임/map3d_u_multirole_ack_plan.js",
+   "sha256": "b948b79349e40ec4068d5e146ff3aa05876ac4f2bf7c5fe914357d2eb27c0b50",
+   "크기": 2789
+  },
+  {
+   "경로": "게임/map3d_u_native_close_ticket_registry.js",
+   "sha256": "59c605432927a5bc572dfc995bd39c7eee8a2e3d749363d79326c666034db782",
+   "크기": 1998
+  },
+  {
+   "경로": "게임/map3d_u_owner_lifecycle.js",
+   "sha256": "a91d5bccba2931ebb2ef5ed81d999f597fb36854327d675613e8577f33e9f174",
+   "크기": 4516
+  },
+  {
+   "경로": "게임/map3d_u_pointer.js",
+   "sha256": "78340970221a46089f678e1de8589c9a07dde50904671baa8b4ad833235cd813",
+   "크기": 5806
+  },
+  {
+   "경로": "게임/map3d_u_private_browser_control.js",
+   "sha256": "c1fcefcb54a2975f970303d094648810bc6c5e638e7d3cef69006b3a209ce083",
+   "크기": 14899
+  },
+  {
+   "경로": "게임/map3d_u_private_browser_lease.js",
+   "sha256": "5d0acf620af4fb205c35376a231bb67eec307b1aed95062c915d54ffa635cd32",
+   "크기": 8939
+  },
+  {
+   "경로": "게임/map3d_u_private_catalog_call.js",
+   "sha256": "19fb8c896072365b4fac79ebc4e565558a1db1bb7d34b29c1d457d33df3a6d31",
+   "크기": 1462
+  },
+  {
+   "경로": "게임/map3d_u_private_catalog_request.js",
+   "sha256": "934613d4c0b756f96b0d98bc2b4b4eeca760d1206edf945a9faa2faba2ff54e8",
+   "크기": 12646
+  },
+  {
+   "경로": "게임/map3d_u_private_catalog_write_call.js",
+   "sha256": "7d532090da913b9f51f723baff87c53d56c20292a3e60c838b43cc490d6f5828",
+   "크기": 1545
+  },
+  {
+   "경로": "게임/map3d_u_private_catalog_write_request.js",
+   "sha256": "924015c2fa865a99bb526042faa1c7a36281034411aa165dd484b1072d15ead0",
+   "크기": 6672
+  },
+  {
+   "경로": "게임/map3d_u_private_catalog_write_then_read.js",
+   "sha256": "886f4296990d35d751014d442350c9391d5c84ea7c237b70a1c0786922cc7979",
+   "크기": 2171
+  },
+  {
+   "경로": "게임/map3d_u_private_control_upgrade_gate.js",
+   "sha256": "e68c7e52e097ecde5a6bf25716d99b92f3c1846a3a1c071178e9eef69056a678",
+   "크기": 2330
+  },
+  {
+   "경로": "게임/map3d_u_private_fixed_launcher.js",
+   "sha256": "33d4ca8d22e3f9c8f4c5aba0bb776d3ba0b6c96ae3bfe7eb16b623ca3802617a",
+   "크기": 2154
+  },
+  {
+   "경로": "게임/map3d_u_private_map_response.js",
+   "sha256": "a60577c1b69fd94ff895a72caca9097f9d2b5504631d3dccd75bbbb1de340aa1",
+   "크기": 2444
+  },
+  {
+   "경로": "게임/map3d_u_private_native_owner_adapter.js",
+   "sha256": "659edac9d2c48253270b43b62454110905c7a93d282714b30b17e85d6ecf95dd",
+   "크기": 1186
+  },
+  {
+   "경로": "게임/map3d_u_private_owner_slot.js",
+   "sha256": "b5511e11c1299f356f79dadb222d3625d25a63acc3ba5cf2aba5b0f09c85dc62",
+   "크기": 2708
+  },
+  {
+   "경로": "게임/map3d_u_private_registration_boundary.js",
+   "sha256": "872c342b8baf493461a0b81007a2715dce65dcd2fb877b8d5d191ce0a727af4b",
+   "크기": 6898
+  },
+  {
+   "경로": "게임/map3d_u_private_source_guard.js",
+   "sha256": "84c91bff4ffb7e89fc284712581388773ad7ca0fcdf2e9532551fa1cfcc9b73a",
+   "크기": 2281
+  },
+  {
+   "경로": "게임/map3d_u_private_tracked_request.js",
+   "sha256": "6d63d7c65e927b8e564df2302a598dff02ccaca090c86a52f1572b91bab1beb0",
+   "크기": 5552
+  },
+  {
+   "경로": "게임/map3d_u_private_typed_producer.js",
+   "sha256": "9f58c4b901151fd6f7dfe8f6f77cee5dcf3cc0ef7385d7d4b3a3fe47fd61fd24",
+   "크기": 21570
+  },
+  {
+   "경로": "게임/map3d_u_private_websocket_transport.js",
+   "sha256": "cefb8210be44f760b5f45c4063c3831ef0f4166952f0963db747365bd02fdc0f",
+   "크기": 4885
+  },
+  {
+   "경로": "게임/map3d_u_public_roots.js",
+   "sha256": "e0a66dd54fa1e50fe301ac354cbec52607eec172535ae0affb37fcda25a15f11",
+   "크기": 5152
+  },
+  {
+   "경로": "게임/map3d_u_root.js",
+   "sha256": "04fb2f37b07cc00c3ecf4fc79fa7af00a98bd3d5ec9baacf1dd537cc33a7a76f",
+   "크기": 2137
+  },
+  {
+   "경로": "게임/map3d_u_selection_session.js",
+   "sha256": "29471ddde1deb887ab5025ae1b48d197605f21f56510fa53bb00621606c80ebf",
+   "크기": 6414
+  },
+  {
+   "경로": "게임/map3d_u_server_request_input.js",
+   "sha256": "1e1ca7ddd9ea8bd47331b1c23b010b6bebdd6d7e69c72961bb18c21eb888ef5e",
+   "크기": 5768
+  },
+  {
+   "경로": "게임/map3d_u_typed_frame_parser.js",
+   "sha256": "3658b2ed7e99e24eeb16b729a9a9643f37b482551b4a2bd2294d19202877c9ca",
+   "크기": 16732
+  },
+  {
+   "경로": "게임/server.js",
+   "sha256": "63a692d4c7006730516122c5bd837a4bdf4d4a745d06ae3b3987effd7a2790fb",
+   "크기": 133678
+  },
+  {
+   "경로": "게임/패치받기.js",
+   "sha256": "c4a2d8bc807bafed679afabd64b73d07242e309cb962817f99365d070d8ba4b8",
+   "크기": 13658
+  }
+ ],
+ "설치엔진": [
+  {
+   "경로": "게임/설치엔진.js",
+   "sha256": "a2b6baf1e2a5232150a4778fcc05bec1ff187017f3124ab91d90d78af971f9f0",
+   "크기": 20703
+  },
+  {
+   "경로": "게임/arj.js",
+   "sha256": "d3d77ec1b82c34cca5efbc1762c6841ba8cf7e0bae4c1bba74c265dfbc0a60db",
+   "크기": 9371
+  },
+  {
+   "경로": "게임/g1_diff.js",
+   "sha256": "820af2cb33473403a984419c7c2ef5d9e8d4890cca16b90b440af3bac2dc927f",
+   "크기": 5787
+  }
+ ]
+}
