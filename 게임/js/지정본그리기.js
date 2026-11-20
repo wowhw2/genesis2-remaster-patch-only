@@ -6166,7 +6166,10 @@ function 만들기(환경) {
       const cap = [], sourceCap = [], extraCap=[], extraSourceCap=[];
       for (let y=0;y<지정.H;y++) for (let x=0;x<지정.W;x++) {
         const k=y*지정.W+x;
-        if (roomOwners?.[k*4+2] || (roomOwners?.[k*4]!==255 && (!roomOwners?.[k*4+3] || roomOwners[k*4+1]))) continue;
+        /* 정본 333 — 보호 표식(G · 뒤 외곽 축대·좌우 끝)이 붙은 축대 칸도 넣는다: 아래 original 이 아니라 «전체 모드 전용»(extra) 목록으로 가서 하단 모드는 그대로다.
+         *   «전체» 모드 셰이더는 owner.a 만 보고 이 칸 벽을 내리는데 덮개 목록에서 빠져, 축대가 위에 있는 실내 맵 맨 윗벽 아래가 검게 비었다
+         *   (사장님 11-20 「벽내리기 모두내리기 관련해서 맨 위쪽 벽 부분에(축대면에 해당하는 부분) 일부가 검게 나오는 문제」·「어디든 그래 위에 축대가 있는 마을 실내 대부분의 맵이」·「평면일때는 나와」 · DENISIN 재현) */
+        if (roomOwners?.[k*4+2] || (roomOwners?.[k*4]!==255 && !roomOwners?.[k*4+3])) continue;
         // 기존 외부 빈칸의 투명 원천에는 절단할 벽 표면이 없다. 재료만 생기는 단면을 제외한다.
         if (지정._실내재료외부빈칸?.[k] && 오브층색) {
           let visible=false;
