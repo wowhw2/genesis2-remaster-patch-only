@@ -127,6 +127,7 @@
     '#가상왼{left:max(8px,env(safe-area-inset-left))}#가상오{right:max(8px,env(safe-area-inset-right))}' +
     '#터치단추{right:max(6px,env(safe-area-inset-right))}' +
     'body.가상켬 #가상왼,body.가상켬 #가상오{display:grid}' +
+    '.가상크기모름 #가상왼,.가상크기모름 #가상오{visibility:hidden}' +   /* 정본 338 — 판 크기를 잴 때까지 숨김 */
     /* 데드존 — 패드 둘레 보이지 않는 띠(칸의 0.4배 · 48px 칸이면 19px). 눌러도 아무 일 없다(판위 → 땅 누름으로 안 바꿈)
      *   (정본 317 · 사장님 11-20 「십자키를 누르다가 옆에 지면이 터치되어서 타일이 이동하는 문제도 있어. 십자키나 버튼 주변은 약간의 데드존이 필요해보여」) */
     '#가상왼::before,#가상오::before{content:"";position:absolute;inset:calc(var(--g2칸,48px)*-0.4);z-index:-1}' +
@@ -203,6 +204,11 @@
   function 크기맞추기() {
     /* 게임 화면 너비 = 셸 판(#판)이 화면에서 실제로 차지하는 너비 — 화면비 설정·전투 캔버스(창 전체)로 재면 틀린다(11-19 실측: 설정 4:3 인데 판은 636×398) */
     var 판el = document.getElementById('판'), 게임w = 판el ? 판el.getBoundingClientRect().width : 0;
+    /* 정본 338 — 처음엔 게임 판이 아직 자리를 안 잡아 너비가 0 → 짐작한 값으로 큰 패드가 나왔다가 2초 뒤 작아졌다
+     *   (사장님 11-20 「처음 시작시 가상패드가 크게 나왔다가 작아지는 문제가 있어」) ⇒ 잴 수 있을 때까지(최대 1.5초) 패드를 숨겨 둔다 */
+    var 루트 = document.documentElement;
+    if (!게임w && Date.now() - 크기시작 < 1500) { if (루트.classList) 루트.classList.add('가상크기모름'); return; }
+    if (루트.classList) 루트.classList.remove('가상크기모름');
     if (!게임w) 게임w = Math.min(innerWidth, innerHeight * 16 / 10);
     var 띠 = (innerWidth - 게임w) / 2;
     /* 안전 영역(카메라 구멍 쪽)만큼 띠가 좁아진다 — 패드가 그만큼 안쪽에 선다 */
@@ -213,7 +219,17 @@
     칸w = Math.max(30, Math.min(칸w, Math.floor((innerHeight - 20 - 14 - 24) / 6)));
     document.documentElement.style.setProperty('--g2칸', 칸w + 'px');
   }
+  var 크기시작 = Date.now();
   addEventListener('resize', 크기맞추기); setInterval(크기맞추기, 2000);
+  /* 정본 338 — 판 크기가 바뀌는 순간 다시 잰다 · 처음 3초는 화면마다 (2초 간격만으로는 처음 큰 패드가 보였다) */
+  (function 처음재기() {
+    var 끝 = Date.now() + 3000, 판관찰 = false;
+    (function 한장() {
+      크기맞추기();
+      if (!판관찰 && typeof ResizeObserver === 'function') { var 판el = document.getElementById('판'); if (판el) { 판관찰 = true; try { new ResizeObserver(function () { 크기맞추기(); }).observe(판el); } catch (e) { } } }
+      if (Date.now() < 끝 && typeof requestAnimationFrame === 'function') requestAnimationFrame(한장);
+    })();
+  })();
   function 칸(판, 단추, 열, 행) { if (단추) { 단추.style.gridColumn = 열; 단추.style.gridRow = 행; 판.appendChild(단추); } }
   function 가상그리기() {
     if (document.body) document.body.classList.toggle('가상켬', 가상켬);
