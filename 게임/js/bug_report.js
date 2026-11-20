@@ -38,9 +38,28 @@
   (function 재기() {
     if (typeof root.requestAnimationFrame !== 'function') return;
     var 앞 = 0;
-    function 한장(t) { if (앞 && t - 앞 < 2000) { 장사이.push(t - 앞); if (장사이.length > 600) 장사이.shift(); } 앞 = t; root.requestAnimationFrame(한장); }
+    function 한장(t) { if (앞 && t - 앞 < 2000) { 장사이.push(t - 앞); if (장사이.length > 600) 장사이.shift(); 초에넣기(t, t - 앞); } 앞 = t; root.requestAnimationFrame(한장); }
     root.requestAnimationFrame(한장);
   })();
+  /* 정본 341 — 휴대폰은 옵션을 열어야 신고할 수 있어 «최근 600장»이 옵션 화면 값으로 바뀐다
+   *   (사장님 11-20 「일단 패드에서 접수를 하려면 옵션을 열어서 할수밖에 없어. 느린 화면에서 바로 보낼수가 없어」)
+   *   ⇒ 최근 3분을 1초씩(장면 이름·장 수·가장 긴 장) 적어 두고, 장면별 요약도 따로 — 옵션을 열기 전 느린 구간이 신고에 남는다 */
+  var 초기록 = [], 장면별 = {};
+  function 지금장면() {
+    var 셸 = '', 맵 = '';
+    try { 셸 = root.__셸 && root.__셸.수명주기 ? root.__셸.수명주기().화면 || '' : ''; } catch (e) { }
+    try { var G = root.G2; 맵 = G && G.scene ? G.scene._시나리오 || G.scene['맵파일'] || '' : ''; } catch (e) { }
+    return 셸 + (맵 ? ' ' + 맵 : '');
+  }
+  function 초에넣기(t, 사이) {
+    var 초 = Math.floor(t / 1000), 끝 = 초기록[초기록.length - 1], 면 = 지금장면();
+    if (!끝 || 끝.초 !== 초 || 끝.장면 !== 면) {   /* 1초 안에서 장면이 바뀌어도 칸을 새로 — 옵션 장이 앞 장면 값에 섞이지 않게 */
+      끝 = { 초: 초, 장면: 면, 장: 0, 합: 0, 최장: 0 }; 초기록.push(끝); if (초기록.length > 240) 초기록.shift();
+    }
+    끝.장++; 끝.합 += 사이; if (사이 > 끝.최장) 끝.최장 = 사이;
+    var s = 장면별[끝.장면] || (장면별[끝.장면] = { 장: 0, 합: 0, 끊김: 0 });
+    s.장++; s.합 += 사이; if (사이 > 50) s.끊김++;
+  }
   function 진단() {
     var o = {};
     o.화면속도 = 해(function () {
@@ -48,6 +67,16 @@
       var 정렬 = 장사이.slice().sort(function (a, b) { return a - b; }), 합 = 장사이.reduce(function (s, v) { return s + v; }, 0);
       var 느림 = 정렬[Math.floor(정렬.length * 0.95)] || 정렬[정렬.length - 1];
       return { 장: 장사이.length, 평균fps: Math.round(1000 / (합 / 장사이.length) * 10) / 10, 느린5퍼fps: Math.round(1000 / 느림 * 10) / 10, 끊김장_50ms넘음: 장사이.filter(function (v) { return v > 50; }).length };
+    });
+    /* 정본 341 — 장면별 평균 · 최근 3분 1초씩(지금에서 몇 초 전 · 장면 · fps · 가장 긴 장 ms) */
+    o.장면별화면속도 = 해(function () {
+      var r = {};
+      Object.keys(장면별).forEach(function (k) { var s = 장면별[k]; r[k || '(모름)'] = { 장: s.장, 평균fps: Math.round(1000 / (s.합 / s.장) * 10) / 10, 끊김장_50ms넘음: s.끊김 }; });
+      return r;
+    });
+    o.최근3분 = 해(function () {
+      var 끝 = 초기록.length ? 초기록[초기록.length - 1].초 : 0;
+      return 초기록.map(function (c) { return (끝 - c.초) + '초 전 · ' + (c.장면 || '(모름)') + ' · ' + Math.round(1000 / (c.합 / c.장)) + 'fps · 최장 ' + Math.round(c.최장) + 'ms'; });
     });
     o.그래픽 = 해(function () {
       var c = document.createElement('canvas'), gl = c.getContext('webgl2') || c.getContext('webgl'), r = { webgl: !!gl, webgl2: !!(gl && root.WebGL2RenderingContext && gl instanceof root.WebGL2RenderingContext) };

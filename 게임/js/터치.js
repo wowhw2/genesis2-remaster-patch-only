@@ -44,8 +44,10 @@
   function 가운데로() { 쏘기('mousemove', innerWidth / 2, innerHeight / 2, 0); }
 
   var 판위 = function (el) { return !!(el && el.closest && el.closest('.g2판')); };   /* ESC 단추·가상 패드 — 클릭으로 바꾸지 않는다 */
+  /* 정본 342 — 글칸(버그 신고 설명 등)은 손대지 않는다: 눌러 글쇠판·길게 눌러 복사·붙여넣기 (사장님 11-20 신고 「버그리포트에 복사 붙여넣기 가능했으면 합니다」) */
+  var 글칸위 = function (el) { return !!(el && el.closest && el.closest('textarea,input,[contenteditable="true"]')); };
   document.addEventListener('touchstart', function (e) {
-    if (판위(e.target)) return;                                      /* 우리 단추는 그대로 누른다 */
+    if (판위(e.target) || 글칸위(e.target)) return;                   /* 우리 단추는 그대로 누른다 · 글칸은 그대로 */
     e.preventDefault();
     var 게임손 = [].filter.call(e.touches, function (t) { return !판위(t.target); }).length;   /* 가상 패드를 누른 손가락은 두 손가락 셈에서 뺀다 */
     if (게임손 >= 2) {                                              /* 두 손가락 — 맥 터치패드처럼 (정본 328) · 첫 손가락의 누름은 버린다 */
@@ -68,6 +70,7 @@
   }, { passive: false });
 
   document.addEventListener('touchmove', function (e) {
+    if (!두손 && 글칸위(e.target)) return;                          /* 정본 342 — 글칸 안 고르기 끌기 */
     if (두손) {                                                     /* 두 손가락 — 배율·기울기 (정본 328) */
       e.preventDefault();
       var L = [].filter.call(e.touches, function (t) { return !판위(t.target); }).slice(0, 2);
@@ -90,6 +93,7 @@
   }, { passive: false });
 
   function 끝(e) {
+    if (!두손 && 글칸위(e.target)) return;                          /* 정본 342 — 글칸 톡·길게 누르기 메뉴 */
     if (두손) {                                                     /* 두 손가락을 떼는 중 — 첫 손가락이 떨어질 때 톡이면 우클릭 · 다 떨어지면 정리 (정본 328) */
       e.preventDefault();
       if (!두손.모드 && Date.now() - 두손.시작 < 350) {
@@ -118,6 +122,7 @@
   /* 확대·당겨서 새로고침·글자 고르기를 막는다 */
   var 꼴 = document.createElement('style');
   꼴.textContent = 'html,body{touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}' +
+    'textarea,input{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;touch-action:auto}' +   /* 정본 342 — 글칸은 고르기·복사·붙여넣기 */
     '.g2판 button{font:bold 13px sans-serif;color:#f8e890;background:rgba(40,48,40,0.55);border:1px solid rgba(248,232,144,0.4);border-radius:8px;padding:0;touch-action:none}' +
     '.g2판 button.눌림{background:rgba(200,168,72,0.75);color:#201808}' +
     '#터치단추{position:fixed;right:6px;top:8px;z-index:2147483000;display:flex;flex-direction:column;gap:8px}' +
@@ -264,6 +269,11 @@
   }
   if (document.body) 단추달기(); else document.addEventListener('DOMContentLoaded', 단추달기);
   /* 게임 «종료»(EXIT) — 모바일 앱은 특별 주소로 앱 본체(MainActivity 의 G2앱창구)에 알려 앱을 닫는다 (데스크톱 G2앱.종료 와 같은 자리) */
-  if (!root.G2앱) root.G2앱 = { 종료: function () { location.href = 'g2app://exit'; } };
+  /* 정본 343 — 아이폰 본체는 g2app://exit 를 가로채지 않아 «종료하기»에서 멈췄다(아이패드 신고 11-20 · 사장님 「실행기 첫화면으로 돌아가면 안돼 종료되어야지」)
+   *   ⇒ 아이폰 본체(아이폰_시작.swift G2ExitGate)가 단 메시지 창구 «g2exit» 가 있으면 거기로 알려 앱을 끝낸다 · 없으면(안드로이드) 그대로 g2app://exit */
+  if (!root.G2앱) root.G2앱 = { 종료: function () {
+    var 창구 = root.webkit && root.webkit.messageHandlers && root.webkit.messageHandlers.g2exit;
+    if (창구) 창구.postMessage('exit'); else location.href = 'g2app://exit';
+  } };
   root.G2터치 = { 켜짐: true, ESC: function () { 키('Escape'); } };   /* ESC — 안드로이드 «뒤로»도 이것을 부른다(MainActivity) */
 })(typeof window !== 'undefined' ? window : this);
