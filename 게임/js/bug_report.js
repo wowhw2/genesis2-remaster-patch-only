@@ -213,7 +213,10 @@
     var 환경 = fetch('/__환경', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (e) {
       결과.원본경로 = e && e.원본경로; 결과.CD경로 = e && e.CD경로; 결과.CD찾음 = e && e.CD찾음; 결과.세이브경로 = e && e.세이브경로;
     }, function (e) { 결과.환경 = '실패 ' + (e && e.message); });
-    Promise.all([환경, 트랙(2), 트랙(11)]).then(function () { 배경음점검 = 결과; }, function () { 배경음점검 = 결과; });
+    /* 휴대폰 — 앱 설치 서버(본체 47861 /cdcheck)의 CD폴더·원본 폴더 파일 목록과 cue 안 FILE (사장님은 신고자에게 되물을 수 없다 · 11-21) */
+    var 설치CD = !모바일 ? Promise.resolve() : fetch('http://127.0.0.1:47861/cdcheck', { cache: 'no-store' }).then(function (r) { return r.json(); })
+      .then(function (j) { 결과.설치CD = j; }, function (e) { 결과.설치CD = '실패 ' + (e && e.message); });
+    Promise.all([환경, 트랙(2), 트랙(11), 설치CD]).then(function () { 배경음점검 = 결과; }, function () { 배경음점검 = 결과; });
   }
   function 열기() {
     if (창) return;
