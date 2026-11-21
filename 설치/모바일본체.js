@@ -148,6 +148,19 @@ async function 설치하기() {
 
 /* ── 게임 서버 — 데스크톱 main.js 게임열기 와 같은 설정으로 game/server.js 를 띄운다 ── */
 let 게임켬 = false;
+/* 정본 362 — 게임 서버(server.js · 패치로 못 바꾸는 엔진)는 이 프로세스 안에서 돈다 → 서버가 찍는 줄(켜질 때 «CD음악» · «404 CD트랙»)을 붙잡아
+ *   /cdcheck 로 버그 신고에 실어 보낸다 (아이패드 배경음 404 — 같은 폴더 꼴을 PC 에서 띄우면 나오는데 기기에서만 안 나옴 · 신고 101607) */
+const 서버기록 = [];
+function 서버기록붙잡기() {
+  if (서버기록붙잡기.됨) return; 서버기록붙잡기.됨 = true;
+  for (const 갈래 of ['log', 'warn', 'error']) {
+    const 원 = console[갈래].bind(console);
+    console[갈래] = function () {
+      try { 서버기록.push(new Date().toISOString().slice(11, 19) + ' ' + Array.prototype.map.call(arguments, a => typeof a === 'string' ? a : (a && a.message) || String(a)).join(' ').slice(0, 400)); if (서버기록.length > 300) 서버기록.splice(0, 서버기록.length - 300); } catch (e) { }
+      return 원.apply(null, arguments);
+    };
+  }
+}
 function 게임띄우기(r) {
   /* GAME.CFG — 원본 CD 에 없고 원본 설치 프로그램이 만든다 → 없으면 출하 기본값 10B (앱 main.js 와 같음) */
   try { if (!fs.readdirSync(r.창2).some(f => f.toUpperCase() === 'GAME.CFG'))
@@ -161,6 +174,7 @@ function 게임띄우기(r) {
     'G2_세이브경로': path.join(데이터, '세이브'), 'G2_상태경로': path.join(데이터, '상태'), 'G2_덮어쓰기경로': 덮어쓰기 });
   fs.mkdirSync(path.join(데이터, '세이브'), { recursive: true });
   fs.mkdirSync(path.join(데이터, '상태', 'CHAPDATA'), { recursive: true });
+  서버기록붙잡기();
   require(path.join(게임폴더, 'server.js'));
   게임켬 = true;
 }
@@ -199,8 +213,21 @@ http.createServer(async (req, res) => {
         } catch (e) { o.오류 = e.code || e.message; }
         본[d] = o;
       }
+      /* 서버가 CD 음악을 찾는 차례(server.js cdAudio)를 그대로 — 설정.txt 의 CD경로 → cue 를 설치엔진.큐읽기로 풀어 이미지가 있나 · 서버 콘솔 줄 */
+      let 설정글 = null; try { 설정글 = fs.readFileSync(path.join(데이터, '설정.txt'), 'utf8'); } catch (e) { 설정글 = '못 읽음 ' + (e.code || e.message); }
+      const 큐풀이 = {};
+      try {
+        const 큐읽기 = require(path.join(게임폴더, '설치엔진.js')).큐읽기, m = /^CD경로=(.*)$/m.exec(설정글 || '');
+        let d = m && m[1].trim(); if (d && fs.existsSync(d) && fs.statSync(d).isFile()) d = path.dirname(d);
+        큐풀이.CD경로 = d || null; 큐풀이.있음 = !!(d && fs.existsSync(d));
+        if (큐풀이.있음) for (const n of fs.readdirSync(d).filter(n => /\.cue$/i.test(n))) {
+          try { const q = 큐읽기(path.join(d, n)); let 크기 = -1; try { 크기 = fs.statSync(q.bin).size; } catch (e) { } 큐풀이[n.normalize('NFC')] = path.basename(q.bin).normalize('NFC') + ' ' + 크기 + ' ' + (q.모드 || '') + '/' + q.크기; }
+          catch (e) { 큐풀이[n.normalize('NFC')] = '오류 ' + e.message; }
+        }
+      } catch (e) { 큐풀이.오류 = e.message; }
+      const 서버줄 = 서버기록.filter(l => /CD|BGM|음악|원본|설정|오류|Error|404/i.test(l)).slice(-60);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
-      return res.end(JSON.stringify({ 기록: { CD폴더: r.CD폴더, CD: r.CD, 창2: r.창2 }, 데이터: 데이터, 폴더: 본 }));
+      return res.end(JSON.stringify({ 기록: { CD폴더: r.CD폴더, CD: r.CD, 창2: r.창2 }, 데이터: 데이터, 폴더: 본, 설정글, 큐풀이, 서버줄, 게임켬 }));
     }
     if (p === '/state') { const r = 기록읽기(); return 제이슨(res, { 기록: r, 설치됨: !!(r && 창2폴더인가(r.창2) && r.창1), 찾음: 원본찾기(), 진행, 설치중, 설치오류, 바깥폴더: 바깥폴더후보[0] }); }
     if (p === '/reinstall' && req.method === 'POST') {   /* 정본 310 — 첫 화면 «다시 설치» */
