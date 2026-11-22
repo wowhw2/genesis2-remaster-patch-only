@@ -441,7 +441,7 @@ function 옆칸(들, a, 방향) {
   return 최고;
 }
 function 초점(el) { if (!el) return; 칸에가기(el); 옛초점 = 초점열쇠(el); if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); }
-function 패드(명령) {
+function 패드(명령, 새로) {   /* 새로 — 방향을 손 떼었다 새로 눌렀나(true) · 누르고 있어 자동 반복된 것인가(false) · 모르면 새로 (정본 387) */
   if (!창) return false;
   var 들 = 고를것들(), a = 지금칸(), i = 들.indexOf(a);
   if (i < 0 && 명령 !== '취소') { 초점(들[0]); return true; }
@@ -456,9 +456,10 @@ function 패드(명령) {
       } else {
         var 최대 = Number(a.max) || 0, 걸음 = 최대 >= 1e6 ? 1000 : 1;   /* 소지금 1000 · 나머지 1 (좌·우는 10배) — ☠ HP·MP 를 10씩 올렸다 (정본 387 · 사장님 11-22 「에딧에서 hp mp가 10씩 올라가는 문제가 있어」) */
         if (크게) 걸음 *= 10;
-        /* 계속 누르고 있으면 큰 단위로 — 같은 방향이 끊기지 않고 이어지면(첫 자동 반복이 0.3초 뒤라 0.4초 안) 1초 뒤 ×10 · 2.5초 뒤 ×100 (사장님 11-22 「계속 누르고있으면 큰단위로 바뀌는거」) */
+        /* 계속 누르고 있으면 큰 단위로 — 손을 떼지 않고 누르고 있는 동안만(자동 반복) 1초 뒤 ×10 · 2.5초 뒤 ×100 · 새로 누르면 다시 1 단위
+         *   ☠ 처음엔 «0.4초 안에 이어지면 계속»으로 셌다 → 톡톡 끊어 눌러도 갑자기 큰 단위로 뛰었다 (사장님 11-22 「왜 끊어서 하는데 갑자기 한번에 바뀌는 숫자가 바뀌어?」) (사장님 11-22 「계속 누르고있으면 큰단위로 바뀌는거」) */
         var 지금때 = Date.now();
-        if (!바꿈중.연속 || 바꿈중.연속.명령 !== 명령 || 지금때 - 바꿈중.연속.마지막 > 400) 바꿈중.연속 = { 명령: 명령, 시작: 지금때, 마지막: 지금때 };
+        if (새로 !== false || !바꿈중.연속 || 바꿈중.연속.명령 !== 명령) 바꿈중.연속 = { 명령: 명령, 시작: 지금때, 마지막: 지금때 };
         바꿈중.연속.마지막 = 지금때;
         var 누른ms = 지금때 - 바꿈중.연속.시작;
         if (누른ms >= 2500) 걸음 *= 100; else if (누른ms >= 1000) 걸음 *= 10;
@@ -543,7 +544,7 @@ function 열기() {
   /* 창 안의 키·마우스·터치는 게임으로 새지 않게 (버그 신고 창과 같다) */
   ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel', 'contextmenu', 'touchstart', 'touchmove', 'touchend'].forEach(function (t) {
     창.addEventListener(t, function (e) {
-      if (t === 'keydown' && 키명령[e.key]) { e.preventDefault(); 패드(키명령[e.key]); }
+      if (t === 'keydown' && 키명령[e.key]) { e.preventDefault(); 패드(키명령[e.key], !e.repeat); }
       e.stopPropagation();
     });
   });
