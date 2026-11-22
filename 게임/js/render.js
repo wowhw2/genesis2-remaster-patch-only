@@ -12798,7 +12798,10 @@ Renderer.prototype.camTo = function (ex, ey, o) {
       var q = linear ? t : t * t * (3 - 2 * t);      /* 등속 또는 smoothstep */
       self.cam.cx = sx + (ex - sx) * q;
       self.cam.cy = sy + (ey - sy) * q;
-      self.apply();
+      /* 정본 400 — 전투 프레임 루프가 돌고 있으면(카메라 이동 중엔 그 루프가 매 장 apply 한다) 중간 걸음은 예약 표시만 남긴다
+       *   ☠ 여기서도 apply 하면 한 장에 3D 를 두세 번 통째로 다시 그렸다(측정 창 2-4A 3D · 장당 apply 2~5번 · CPU×4 스크롤 한 장 100ms) · 마지막 걸음은 바로 그린다(기다리는 쪽이 곧 자리를 잰다) */
+      if (t < 1 && self.lerpOn && self._프레임루프때 && root.performance && performance.now() - self._프레임루프때 < 100) self._apply예약 = true;
+      else self.apply();
       if (t < 1) 프레임예약(frame, 실패);
       else { self.cam.cx = ex; self.cam.cy = ey; self._camAnim = false; done(); }
     }

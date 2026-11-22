@@ -1698,7 +1698,9 @@
           if (Math.abs(목표 - 표.캠높) < 0.3) 표.캠높 = 목표;
         }
         표.캠앞 = { x: c.cx, y: c.cy };
-        if (표.캠높 !== 목표 && !표.캠예약 && typeof requestAnimationFrame === 'function') {   /* 다 못 따라갔으면 다음 화면에 한 번 더 */
+        /* 정본 400 — 카메라가 움직이는 동안은 전투 프레임 루프가 다음 장에도 apply 하므로 따로 예약하지 않는다(한 장 3D 두 번 그리기) */
+        var 루프가그림 = this.lerpOn && this.카메라이동중인가 && this.카메라이동중인가() && this._프레임루프때 && performance.now() - this._프레임루프때 < 100;
+        if (표.캠높 !== 목표 && !표.캠예약 && !루프가그림 && typeof requestAnimationFrame === 'function') {   /* 다 못 따라갔으면 다음 화면에 한 번 더 */
           표.캠예약 = true;
           requestAnimationFrame(function () { 표.캠예약 = false; try { R.apply(); } catch (e) {} });
         }
@@ -1727,7 +1729,9 @@
        *    3D apply 134번 × 8.9ms · 1958ms 동안 6장 ↔ 2.5D 1.8ms · 687ms 21장). 깃발은 다음 rAF(없으면 34ms)에 풀린다 */
       var 지금 = (root.performance && performance.now()) || 0, 모음 = 켬 && 캠같음 && !root.__리마스터3D즉시 && !!표.이번틀그림;
       if (모음 && !표.다음예약) {
-        var 나 = this, 한번 = function () { if (!표.다음예약) return; 표.다음예약 = false; 표.그린때 = null; 표.이번틀그림 = false; 나.apply(); };
+        /* 정본 400 — 예약한 «뒤»에 이미 통째로 그렸으면(카메라가 움직여 전투 루프가 새로 그림) 그 그림이 지금 상태를 다 담았다 — 또 그리지 않는다
+         *   ☠ 스크롤 중 이것이 매 장 한 번 더 통째로 그려 CPU×4 프로파일의 16% 였다 */
+        var 나 = this, 예약때 = 지금, 한번 = function () { if (!표.다음예약) return; 표.다음예약 = false; if (표.그린때 != null && 표.그린때 > 예약때) return; 표.그린때 = null; 표.이번틀그림 = false; 나.apply(); };
         표.다음예약 = true;
         if (root.requestAnimationFrame) root.requestAnimationFrame(한번);
         setTimeout(한번, 34);

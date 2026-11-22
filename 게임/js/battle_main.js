@@ -16943,6 +16943,7 @@
     }
     /* 게임 프레임 시계 — 카메라 스크롤과 유닛 걷기를 같은 tick 에서 굴립니다 */
     window.__이어도는중 = false;   /* 정본 400 — rAF 안: 이어돌기 동안 미룬 apply예약을 이 장에서 반영 */
+    R._프레임루프때 = performance.now();   /* 정본 400 — 이 루프가 살아 있으면 카메라 트윈(camTo)은 apply 를 이 루프에 맡긴다 */
     var _성t = window.G2성능 ? performance.now() : 0;   /* [개발] 성능 그래프 Game — 정본 400 */
     pumpFrames(dt);
     if (R._apply예약 && R.apply예약) R.apply예약();
