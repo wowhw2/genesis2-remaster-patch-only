@@ -10147,13 +10147,27 @@
       if (!바탕 || !R.팔레트만갈기 || !N || !N.날씨팔레트) return false;
       var 팔 = function (w) { w = w | 0; return (w >= 1 && w <= 4) ? N.날씨팔레트(바탕, w) : new Uint8Array(바탕); };
       var 팔0 = 팔(옛날씨), 팔1 = 팔(새날씨), 걸음수 = 12, 차례 = (R._날씨전환차례 = (R._날씨전환차례 | 0) + 1);
+      /* ★ 정본 400 — 걸음은 «시간»에 맞춘다: 한 걸음 칠하기에 든 시간의 두 배는 화면이 숨 쉬게 두고, 그새 지난 걸음은 건너뛴다
+       *   ☠ 걸음마다 맵 줄 덮개·사물·유닛을 통째로 다시 칠해 느린 기기에선 12걸음이 줄줄이 이어져 화면이 멈춘 듯했다
+       *     (사장님 11-23 「날씨 전환 심각해. 도저히 플레이 불가능할 정도로 느려져.」 · 측정 크롬 2D 스케일러 없음 PC 한 걸음 25~45ms)
+       *   빠른 기기는 예전처럼 12걸음 · 쓰는 팔레트는 같은 12칸 격자 값(딱지도 같다) · 끝은 ms 에 정확한 새 날씨 팔레트 · 끄기 window.__날씨걸음고정 */
+      var 총 = ms || 1200, 시작 = performance.now(), 지난k = 0, 고정 = !!window.__날씨걸음고정;
       var 한걸음 = function (k) {
         if (R._날씨전환차례 !== 차례) return;                                /* 더 새 전환이 오면 그만 */
+        if (!고정) k = Math.max(지난k + 1, Math.floor((performance.now() - 시작) / 총 * 걸음수));
+        지난k = k;
         if (k >= 걸음수) { R.팔레트만갈기(팔1, '날씨' + (새날씨 | 0)); return; }
         var t = k / 걸음수, 섞 = new Uint8Array(팔1.length);
         for (var q = 0; q < 섞.length; q++) 섞[q] = Math.round(팔0[q] + (팔1[q] - 팔0[q]) * t);
+        var 칠0 = performance.now();
         R.팔레트만갈기(섞, '날씨전환' + (옛날씨 | 0) + '_' + (새날씨 | 0) + '_' + k);
-        setTimeout(function () { 한걸음(k + 1); }, (ms || 1200) / 걸음수);
+        var 쉼 = 총 / 걸음수;
+        if (!고정) {
+          쉼 = Math.max(쉼, (performance.now() - 칠0) * 2);
+          var 남 = 시작 + 총 - performance.now();
+          if (쉼 > 남) 쉼 = Math.max(0, 남);                                  /* 끝 팔레트는 제때 */
+        }
+        setTimeout(function () { 한걸음(k + 1); }, 쉼);
       };
       한걸음(1);
       return true;

@@ -9711,11 +9711,11 @@ function 만들기(환경) {
     gl.bindBuffer(gl.ARRAY_BUFFER, 상자버프[1]); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(U), gl.DYNAMIC_DRAW); gl.vertexAttribPointer(loc.uv, 2, gl.FLOAT, false, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, P.length / 3);
   }
-  function 천막그리기(amp){
+  function 천막그리기(amp, 만){   /* 만 — 그 번호 천막 하나만(가림판 줄 차례 덧그리기 · 정본 422) */
     if (!천막 || !천막.length) return;
     if (!천막버프) 천막버프 = [gl.createBuffer(), gl.createBuffer()];
     const 단높이 = 1 / 2, W2 = 지정.W, N = 80;   /* 80 = 4.5° 간격 — 열 갈래(36°)·90° 칸 끝마다 꼭짓점 · 36° 주기 부풂이 각지지 않게 (40 은 한 주기 네 점) */
-    천막.forEach(t => {
+    천막.forEach((t, ti) => { if (만 != null && ti !== 만) return;
       const hv = 지정.지형높이[Math.min(지정.H - 1, t.gy)*W2 + Math.min(W2 - 1, t.cx칸)] * 단높이 * amp, Z밑 = (위여백 + (t.gy + 1) * 지정.TH) - H/2, X0 = t.a0 * 지정.TW - W/2, zc = Z밑 - t.R - 4;   /* −4 = 밑단 퍼짐 — 앞 끝이 원래 판 자리를 넘지 않게 */
       /* 고리 [높이, 반지름, 그림 줄] — 큰 반구(중심 = 기둥 아랫점 · 반지름 R)를 반지름이 R2 가 되는 높이 hj 에서 자르고 그 위에 작은 반구(R2) · 꼭대기에 기둥
        *   그림 세로: 큰 반구 = 그림 끝 줄 → 처마 줄 E · 작은 반구 = E → 지붕 시작 줄 · 기둥 = 지붕 시작 줄 → 그림 맨 윗줄 (몸통 천은 몸통에, 지붕 천은 지붕에) */
@@ -11712,6 +11712,14 @@ function 만들기(환경) {
       (지정.세움 || []).forEach((o) => { if (o.축대붙음 || ((규칙맵 === 'CALIPER' || 규칙맵 === 'EAGLE') && o._곡)) return; const 번 = 세번++; 항목.push({ 줄: 앞줄(o.x, o.gy != null ? o.gy : o.y), 그림: () => {
         gl.bindTexture(gl.TEXTURE_2D, 세움tex); 붙이기(세움버프, 세움UV);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 세움IDX); gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, 번 * 24); } }); });
+    }
+    /* ★ 정본 422 — CALIPER 천막(둥근 몸체 · 천막찾기)은 조각이 _곡 이라 위 세움 항목에서 빠진다 → 천막마다 그 밑 줄 차례로 몸체를 덧그린다
+     *   (사장님 11-23 「캘리퍼 천막 뒤쪽에 유닛이 안가려져」 · 예전엔 천막을 덮는 것이 아무것도 없어 뒤 유닛이 천막 위로 비쳤다) */
+    if (규칙맵 === 'CALIPER' && typeof 천막 !== 'undefined' && 천막 && 천막.length && document.getElementById('세움').checked) {
+      천막.forEach((t, ti) => { 항목.push({ 줄: 앞줄(t.cx칸, t.gy), 그림: () => {
+        gl.enableVertexAttribArray(loc.p); gl.enableVertexAttribArray(loc.uv);
+        if (loc.nrm >= 0) { gl.disableVertexAttribArray(loc.nrm); gl.vertexAttrib3f(loc.nrm, 0, 1, 0); }
+        천막그리기(amp, ti); } }); });
     }
     /* 축대에 붙인 탑 조각(o.축대붙음 · 탑갱신 — 그림 줄마다 축대 비탈을 위로 이어 뒤로 눕힌 면)도 «바닥 줄(gy)» 차례로 덧그린다 — BRD02 만 (2026-11-09)
      *   탑 그림이 바닥 줄 뒤(북) 칸들 위에 비스듬히 누워 있어, 그 칸에 선 유닛이 탑 «속»이 되어 참 깊이로는 탑 윗부분(고리)이 유닛 뒤로 판정됐다
