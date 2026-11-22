@@ -10014,6 +10014,35 @@
     var p = R.screenOfRendered(unit, 12 + (오.dx | 0), -2 + (오.dy | 0));   /* 0x12F2A 기준점 + 그림 가운데 */
     return (p && isFinite(p.x) && isFinite(p.y)) ? { x: Math.round(p.x), y: Math.round(p.y) } : null;
   }
+  /* ★ 정본 414 — 링이 열려 회색 덮개(#ringShade · backdrop-filter 흐림·어둡게)가 깔린 동안 유닛 위 체력 숫자는 덮개 «위»에 또렷하게
+   *   (사장님 11-23 「링커맨드 들어왔을때 체력 hud가 음영처리되는게 불편함. 원작은 체력은 음영처리 되지 않음」)
+   *   체력 숫자는 맵 화면 안 오버레이 층(render.js _값표시층확보)이라 덮개 밑에 깔린다 — 덮개 바로 위(z 26) 캔버스에 보이는 숫자 캔버스를 화면 자리 그대로 옮겨 그리고
+   *   그동안 원래 숫자 층은 감춘다(흐린 숫자가 뒤에 비치지 않게) · 링이 서 있는 동안은 카메라가 멈춰 있어 자리가 맞는다 · 덮개가 걷히면 되돌린다 */
+  var 링체력판 = null, 링체력켬 = false;
+  function 링위체력(켬) {
+    var 층 = R && R.valueLayer;
+    if (!켬) {
+      if (링체력켬) { 링체력켬 = false; if (층) 층.style.visibility = ''; if (링체력판) 링체력판.style.display = 'none'; }
+      return;
+    }
+    var 무대 = ringShade.parentNode; if (!무대 || !층) return;
+    if (!링체력판 || 링체력판.parentNode !== 무대) {
+      링체력판 = document.createElement('canvas'); 링체력판.id = 'ringValues';
+      링체력판.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;z-index:26;pointer-events:none;image-rendering:pixelated;';
+      무대.appendChild(링체력판);
+    }
+    var 틀 = 무대.getBoundingClientRect(), 배 = window.devicePixelRatio || 1, W = Math.round(틀.width * 배), H = Math.round(틀.height * 배);
+    if (링체력판.width !== W || 링체력판.height !== H) { 링체력판.width = W; 링체력판.height = H; }
+    var g = 링체력판.getContext('2d'); g.clearRect(0, 0, W, H); g.imageSmoothingEnabled = false;
+    var 목 = R.valueEls || {};
+    for (var id in 목) {
+      var e = 목[id]; if (!e || e.style.display === 'none' || !e.width || !e.height) continue;
+      var q = e.getBoundingClientRect(); if (q.width < 1 || q.height < 1) continue;
+      g.drawImage(e, Math.round((q.left - 틀.left) * 배), Math.round((q.top - 틀.top) * 배), Math.round(q.width * 배), Math.round(q.height * 배));
+    }
+    링체력판.style.display = '';
+    if (!링체력켬) { 링체력켬 = true; 층.style.visibility = 'hidden'; }
+  }
   function 링따라가기() {
     if (!링유닛 || !G2Ring.isOpen()) return;
     var c = 링자리재기(링유닛); if (!c) return;
@@ -15504,6 +15533,12 @@
     /* 링 문맥이 열려 있어도 **대상 선택 중이면** 스크롤을 허용합니다.
      * (대상 선택 중에는 링 그림이 감춰져 있어 가릴 것도 없습니다) */
     if (G2Ring.isOpen() && !targetPicking()) return null;
+    /* ★ 정본 415 — 부드러운 카메라 이동(센터링 · R._camAnim)이 도는 동안에는 가장자리 스크롤을 쉰다
+     *   (사장님 11-23 「먼 거리 카메라 이동중에 중간에 멈추는 경우가 있음. 중간에 키 입력이 들어가서 멈추는지 다른 원인이 있는지 확인이 필요함.」)
+     *   ☠ 마우스가 화면 가장자리 띠에 머물면(아래 턴 순서 초상을 눌러 먼 아군으로 보낸 직후 등) 가장자리 스크롤이 매 장 scrollScreen 을 불러
+     *     가던 센터링을 끊었다(render.js scrollScreen 이 _centerToken 을 올림) → 카메라가 출발하자마자 중간에 섰다
+     *   원작 포커스 스크롤(0x11003)은 블로킹이라 그동안 커서 루프(가장자리 스크롤 0x4A32C)가 돌지 않는다 · 이동이 끝나면 다시 된다 */
+    if (R && R._camAnim) return null;
     /* ★★★ **개발 위젯 둘레에서는 밀지 않는다** (2026-08-17 · 사용자 지정)
      *
      *   사용자: 「자꾸 게임 스크롤되어서 짜증나」. `onWidget()` 이 **위젯 위**에서는
@@ -17114,6 +17149,7 @@
      *   링 캔버스는 z-index 40 으로 덮개(25)보다 위라 그대로 눌립니다. */
     var shaded = open || ctrl.모드인가('STATUS_VIEW');
     G2Hud.링화면상태반영(ringCv, ringShade, open, shaded);
+    try { 링위체력(open && !!ringShade && ringShade.style.display !== 'none'); } catch (e링체) {}   /* 정본 414 */
     if (open) { ringCtx.clearRect(0, 0, 320, 200); if (G2Ring.isOpen()) { try { 패드링빛(ringCtx); } catch (e패빛) {} G2Ring.draw(ringCtx); } if (부활창) 부활창그리기(ringCtx); }
 
     /* ★ 이펙트도 **화면에 실제로 쓰인 카메라**(표시 보간 반영)를 써야

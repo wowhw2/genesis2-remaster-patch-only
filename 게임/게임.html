@@ -4697,6 +4697,8 @@ window.G2_셸이몬다 = true;
      *     에서 12×12 조각을 골라, 이미 깐 이웃과 겹치는 4 칸이 가장 잘 맞는 것을 잇는다(씨앗 고정 · 늘 같은 결과). 원본 색·결 그대로 · 되풀이 없음
      *   처음 쓸 때 한 번 지어 둔다 · 지어지기 전에는 비워 둔다 · 여백 없으면 아무것도 안 함 */
     var _돌무늬 = null, _돌무늬받는중 = false;
+    /* 정본 400 — 돌 무늬를 켠 지 5초 뒤 미리 나눠 지어 둔다(게임설정 창·넓은 화면 상태창을 처음 열 때 멈추지 않게) */
+    setTimeout(function () { try { if (window.G2GameSettings && G2GameSettings.돌무늬받기 && window.G2Native && G2Native.decodePcx) G2GameSettings.돌무늬받기(바이트); } catch (e) { } }, 5000);
     function 돌무늬짓기(srcs, OW, OH, 씨앗) {
       var B = 12, O = 4, S = B - O, 후보 = [];
       [[0, 0, 164, 77, 35], [1, 178, 7, 118, 17]].forEach(function (k) {
@@ -4729,6 +4731,8 @@ window.G2_셸이몬다 = true;
       if (!_돌무늬) {
         if (!_돌무늬받는중 && window.G2Native && G2Native.decodePcx) {
           _돌무늬받는중 = true;
+          /* 정본 400 — 게임설정 창과 같은 결과를 나눠 지어 같이 쓴다(한 번에 지으면 600ms 멈춤 · js/game_settings.js 돌무늬받기) */
+          if (window.G2GameSettings && G2GameSettings.돌무늬받기) { G2GameSettings.돌무늬받기(바이트).then(function (cv) { if (cv) _돌무늬 = cv; else _돌무늬받는중 = false; }); return; }
           Promise.all([바이트('STATUS.PCX'), 바이트('EQUMENT.PCX')]).then(function (b) {
             var srcs = b.map(function (x) { return G2Native.decodePcx(x); });
             if (srcs[0] && srcs[1]) _돌무늬 = 돌무늬짓기(srcs, 480, 200, 12345);   /* 좌우 여백 합 480(논리 800 폭)까지 */

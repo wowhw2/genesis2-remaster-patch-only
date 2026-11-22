@@ -821,6 +821,57 @@ function 돌무늬짓기(srcs, OW, OH, 씨앗) {
   gx.putImageData(im, 0, 0);
   return cv;
 }
+/* ★ 정본 400 — 돌 무늬를 «나눠» 짓는다 (결과는 돌무늬짓기 와 화소까지 같다 · 블록 순서·난수 순서 그대로)
+ *   한 번에 지으면 블록 1,500개 × 후보 약 2,200개를 견줘 600ms(측정 크롬) 동안 화면이 멈췄다 —
+ *   사장님 PC 기록(성능기록_PC_20261123_004003 · 「게임설정 창 열기」 직후 846ms) · 게임.html 옆무늬채우기(넓은 화면 상태·장비 창 양옆)도 같은 것을 또 지었다
+ *   ⇒ 한 번에 «조각»(기본 5ms)만 계산하고 메시지 채널로 다음 태스크에 이어 간다 · 두 곳이 한 결과를 같이 쓴다 · 게임을 켠 뒤 한가할 때 미리 시작(아래 돌무늬미리) */
+var _돌무늬약속 = null, _돌무늬틀 = null;
+function 돌무늬나눠짓기(srcs, OW, OH, 씨앗, 조각ms) {
+  return new Promise(function (다) {
+    var B = 12, O = 4, S = B - O, 후보 = [];
+    [[0, 0, 164, 77, 35], [1, 178, 7, 118, 17]].forEach(function (k) {
+      for (var y = k[2]; y + B <= k[2] + k[4]; y++) for (var X = k[1]; X + B <= k[1] + k[3]; X++) 후보.push([k[0], X, y]);
+    });
+    var r = 씨앗 >>> 0 || 1, 난 = function () { r ^= r << 13; r ^= r >>> 17; r ^= r << 5; return (r >>> 0) / 4294967296; };
+    var out = new Int16Array(OW * OH).fill(-1), by = 0, bx = 0, 한도 = 조각ms || 5;
+    var 다음 = (typeof MessageChannel === 'function') ? (function () { var mc = new MessageChannel(), f = null; mc.port1.onmessage = function () { var g = f; f = null; if (g) g(); }; return function (g) { f = g; mc.port2.postMessage(0); }; })() : function (g) { setTimeout(g, 0); };
+    function 조각() {
+      var 끝 = (typeof performance !== 'undefined' ? performance.now() : Date.now()) + 한도;
+      while (by < OH) {
+        var 최 = Infinity, 목 = [];
+        for (var t = 0; t < 후보.length; t++) {
+          var c = 후보[t], x = srcs[c[0]], W = x.w, e = 0;
+          for (var yy = 0; yy < B && by + yy < OH && e <= 최; yy++) for (var xx = 0; xx < B && bx + xx < OW; xx++) {
+            var o = out[(by + yy) * OW + bx + xx]; if (o < 0) continue;
+            if (o !== x.px[(c[2] + yy) * W + c[1] + xx]) e++;
+          }
+          if (e < 최) { 최 = e; 목 = [c]; } else if (e === 최) 목.push(c);
+        }
+        var g = 목[(난() * 목.length) | 0], xg = srcs[g[0]], Wg = xg.w;
+        for (var y2 = 0; y2 < B && by + y2 < OH; y2++) for (var x2 = 0; x2 < B && bx + x2 < OW; x2++) out[(by + y2) * OW + bx + x2] = xg.px[(g[2] + y2) * Wg + g[1] + x2];
+        bx += S; if (bx >= OW) { bx = 0; by += S; }
+        if ((typeof performance !== 'undefined' ? performance.now() : Date.now()) > 끝) { 다음(조각); return; }
+      }
+      var P = srcs[0].pal, cv = document.createElement('canvas'); cv.width = OW; cv.height = OH;
+      var gx = cv.getContext('2d'), im = gx.createImageData(OW, OH);
+      for (var i = 0; i < OW * OH; i++) { var ci = out[i] < 0 ? 247 : out[i]; im.data[i * 4] = P[ci * 3]; im.data[i * 4 + 1] = P[ci * 3 + 1]; im.data[i * 4 + 2] = P[ci * 3 + 2]; im.data[i * 4 + 3] = 255; }
+      gx.putImageData(im, 0, 0);
+      다(cv);
+    }
+    다음(조각);
+  });
+}
+/** 돌 무늬 바탕(480×200 · 씨앗 12345) 하나를 나눠 지어 같이 쓴다 — 게임설정 창 · 게임.html 넓은 화면 옆 무늬 */
+function 돌무늬받기(바이트) {
+  if (_돌무늬약속) return _돌무늬약속;
+  var N = root.G2Native;
+  _돌무늬약속 = Promise.all([바이트('STATUS.PCX'), 바이트('EQUMENT.PCX')]).then(function (b) {
+    var srcs = b.map(function (x) { return N.decodePcx(x); });
+    if (!(srcs[0] && srcs[1])) return null;
+    return 돌무늬나눠짓기(srcs, 480, 200, 12345).then(function (cv) { _돌무늬틀 = cv; return cv; });
+  })['catch'](function () { _돌무늬약속 = null; return null; });
+  return _돌무늬약속;
+}
 var _자원 = null;
 /** 그릴 자원(원본 글꼴 · 돌 무늬 바탕)을 한 번만 받는다 — 바이트(이름) 는 Promise<Uint8Array> 를 준다 */
 function 자원받기(바이트) {
@@ -828,17 +879,14 @@ function 자원받기(바이트) {
   var N = root.G2Native, 자 = { 글꼴: null, 바탕: null };
   _자원 = Promise.all([
     N.loadFonts({ bytes: 바이트 }).then(function (f) { 자.글꼴 = f; }, function () { }),
-    Promise.all([바이트('STATUS.PCX'), 바이트('EQUMENT.PCX')]).then(function (b) {
-      var srcs = b.map(function (x) { return N.decodePcx(x); });
-      if (srcs[0] && srcs[1]) 자.바탕 = 돌무늬짓기(srcs, 480, 200, 12345);   /* 16:9 논리 폭 427 보다 넓게 */
-    }, function () { })
+    돌무늬받기(바이트).then(function (cv) { 자.바탕 = cv; }, function () { })   /* 16:9 논리 폭 427 보다 넓게 · 나눠 짓기(정본 400) */
   ]).then(function () { return 자; });
   return _자원;
 }
 
 var API = { 창: 창, 틀계산: 틀계산, 쪽짓기: 쪽짓기, 기본값: 기본값, 규칙: 규칙, 규칙설명: 규칙설명, 줄나누기: 줄나누기, 설명폭: 설명폭, 설명줄수: 설명줄수, 글폭: 글폭, 틀: 틀, 실제이름: 실제이름,
             배속표: 배속표, 경험치배율표: 경험치배율표, 적능력배율표: 적능력배율표,
-            게임값: 게임값, 게임적용: 게임적용, 돌무늬짓기: 돌무늬짓기, 자원받기: 자원받기 };
+            게임값: 게임값, 게임적용: 게임적용, 돌무늬짓기: 돌무늬짓기, 자원받기: 자원받기, 돌무늬받기: 돌무늬받기, 돌무늬나눠짓기: 돌무늬나눠짓기 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 root.G2GameSettings = API;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
