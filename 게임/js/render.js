@@ -745,6 +745,48 @@ Renderer.prototype._세움그림URL = function (o) {
   } catch (e) { return this._블록그림URL(o.blockIndex); }
 };
 /** 팔레트만 바뀔 때 — 블록 배경을 가진 오브젝트 요소마다 자식 캔버스에 새 팔레트의 블록 그림을 옮긴다. 옮긴 수를 돌려준다(0 이면 다시 짓기로) */
+/** 요소의 블록 기억 — 배경 주소(data URL)로 블록 표를 찾아 요소에 쥔다 (_오브젝트색칠하기 가 쓴다)
+ *  칠한 캔버스를 얹은 요소는 배경을 감춰 두었다 — 원래 주소는 _블록원url 에 있다 */
+function 블록기억(e, 역) {
+  var m = e._블록memo;
+  if (m && m.역 === 역) return m;
+  var bg = e.style && e.style.backgroundImage;
+  var u = (bg && bg.indexOf('url(') === 0) ? bg.slice(4, -1).replace(/^"|"$/g, '') : (bg === 'none' ? e._블록원url : null);
+  var 표 = u ? 역[u] : null;
+  return (e._블록memo = { 역: 역, u: u, 표: 표 || null, bg: (bg === 'none') ? 'none' : 'url' });
+}
+/* ★ 정본 400 — 맵을 지은 뒤 한가할 때 사물마다 블록 기억을 미리 채운다
+ *   ☠ 처음 팔레트가 바뀔 때(전투 중 첫 날씨 바뀜) 사물 1,500여 개의 배경 주소(긴 data URL)를 처음 읽고 찾느라
+ *     휴대폰 흉내(CPU×6 · 2-4A)에서 그 걸음이 610ms · 그중 이 찾기 1.1초(프로파일 합) 였다 (사장님 11-23 「날씨 전환 심각해…」 · 휴대폰)
+ *   그때 있는 사물은 주소가 이미 표에 올라 있다(요소를 만들 때 함께 올린다) · 나중에 생기는 사물은 쓸 때 스스로 만든다 · 끄기 window.__블록기억미리끔 */
+Renderer.prototype._블록기억미리 = function () {
+  var self = this;
+  if (root.__블록기억미리끔 || typeof document === 'undefined' || typeof setTimeout !== 'function') return;
+  if (this._블록기억타이머) clearTimeout(this._블록기억타이머);
+  var 다음 = (typeof root.requestIdleCallback === 'function')
+    ? function (f) { root.requestIdleCallback(f, { timeout: 1000 }); }
+    : function (f) { setTimeout(function () { f(null); }, 16); };
+  this._블록기억타이머 = setTimeout(function () {
+    self._블록기억타이머 = null;
+    var 역 = self._블록URL역; if (!역) return;
+    var els = [];
+    [self.objLayer, self.flatObjLayer, self.backdropEl].forEach(function (층) {
+      if (층 && 층.querySelectorAll) [].push.apply(els, 층.querySelectorAll('div,span'));
+    });
+    var i = 0;
+    var 돌 = function (기한) {
+      if (self._렌더러폐기됨 || self._블록URL역 !== 역) return;
+      var t0 = performance.now();
+      while (i < els.length) {
+        var e = els[i++];
+        if (e.isConnected) 블록기억(e, 역);
+        if ((기한 && !기한.didTimeout) ? !(기한.timeRemaining() > 2) : (performance.now() - t0 > 4)) break;
+      }
+      if (i < els.length) 다음(돌);
+    };
+    다음(돌);
+  }, 2000);
+};
 Renderer.prototype._오브젝트색칠하기 = function (pal) {
   var 역 = this._블록URL역; if (!역 || !this.nmap) return 0;
   var self = this, 판 = {}, n = 0, 바탕 = this._palSaved || this._음영바탕 || pal, 맵 = this.nmap;
@@ -764,16 +806,9 @@ Renderer.prototype._오브젝트색칠하기 = function (pal) {
       var e = els[i], bg, u, 표;
       /* ★ 한 번 찾은 것은 요소에 기억한다 — 배경 주소는 data URL 이라 걸음마다 읽으면 2-4A 에서 1570개 · 28.6MB · 53ms 였다 (2026-09-26 · Z-72)
        *   배경을 바꾸는 곳은 fx.js 오브젝트 애니 하나다 — 거기서 _블록memo 를 비운다 */
-      var m = e._블록memo;
-      if (m && m.역 === 역) { if (!m.표) continue; u = m.u; 표 = m.표; bg = e._블록캔버스 ? 'none' : m.bg; }
-      else {
-        bg = e.style && e.style.backgroundImage;
-        /* 칠한 캔버스를 얹은 요소는 배경을 감춰 두었다 — 원래 주소는 _블록원url 에 있다 */
-        u = (bg && bg.indexOf('url(') === 0) ? bg.slice(4, -1).replace(/^"|"$/g, '') : (bg === 'none' ? e._블록원url : null);
-        표 = u ? 역[u] : null;
-        e._블록memo = { 역: 역, u: u, 표: 표 || null, bg: (bg === 'none') ? 'none' : 'url' };
-        if (!표) continue;
-      }
+      var m = 블록기억(e, 역);   /* 정본 400 — 기억 만들기를 떼어 냈다(맵을 지은 뒤 한가할 때 미리 · _블록기억미리) */
+      if (!m.표) continue;
+      u = m.u; 표 = m.표; bg = e._블록캔버스 ? 'none' : m.bg;
       /* 스케일러면 화면 밖 오브젝트는 들어올 때 칠한다(바닥·행과 같은 까닭 · _밀어두기) — 배경은 그때까지 바탕 그림 그대로 */
       if (확대 && !창안인가(e)) { self._밀어두기(e, { fn: 칠하기.bind(null, e, bg, u, 표) }); n++; continue; }
       if (칠하기(e, bg, u, 표)) n++;
@@ -4184,6 +4219,7 @@ Renderer.prototype._맵단계_바닥굽기 = function (map) {
   this._범위미리();   /* 정본 336 — 잠잠해지면 미리 만든다 */
   this._가시리맵URL = null; this._가시리맵팔 = null;   /* [리마스터] 무덤 가시 리맵판 */
   this._범위리맵미리굽기();
+  this._블록기억미리();   /* 정본 400 — 첫 팔레트 걸음(전투 중 첫 날씨 바뀜)이 멈추지 않게 */
 };
 
 /* ★ 범위 표시 바닥(맵 전체 리맵판)을 «한가할 때» 미리 굽는다 (2026-10-10 사장님 「링커맨드 처음 열때 버벅거리고 계속 그런다고」)
@@ -4517,7 +4553,11 @@ Renderer.prototype._칠맡기기 = function (e, 판, pal, c, sx, sy, w, h) {
 /** 화면 밖 요소의 칠을 밀어 둔다 — m 은 판 칠하기 인자거나 { fn } (그 자리에서 할 일) */
 Renderer.prototype._밀어두기 = function (e, m) {
   e._밀린칠 = m;
-  (this._칠밀림 || (this._칠밀림 = [])).indexOf(e) < 0 && this._칠밀림.push(e);
+  this._밀림판 = (this._밀림판 | 0) + 1;   /* 정본 400 — 새로 밀면 다음 장에 다시 잰다(_밀린칠하기 열쇠) */
+  /* 정본 400 — «이미 있나»는 집합으로 (목록 전체 indexOf 는 조각 1,385개면 한 걸음에 약 100만 번 비교였다) */
+  var 모 = this._칠밀림모음 || (this._칠밀림모음 = new Set());
+  if (!this._칠밀림) this._칠밀림 = [];
+  if (!모.has(e)) { 모.add(e); this._칠밀림.push(e); }
   /* ☠ apply 만 믿으면 카메라가 다른 길로 움직일 때 영영 안 칠해진다 — 밀린 것이 있는 동안 매 프레임 본다
    *   (2026-09-25 사장님 「다른거는 시전된 화면 밖의 일부가 바뀌는데」) */
   var self = this;
@@ -4532,10 +4572,25 @@ Renderer.prototype._밀어두기 = function (e, m) {
   }
 };
 /** apply 마다 — 밀어 둔 조각 가운데 화면에 들어온 것을 칠한다 */
+/* 정본 400 — 창 크기가 바뀐 횟수 (_밀린칠하기 열쇠) · ☠ innerWidth/innerHeight 를 읽으면 그 자리에서 밀린 배치 계산을 해 휴대폰 흉내 한 번 약 6ms 였다 */
+var 창크기바뀜 = 0;
+if (root.addEventListener) { try { root.addEventListener('resize', function () { 창크기바뀜++; }); } catch (e창) {} }
 Renderer.prototype._밀린칠하기 = function () {
-  var 남 = [];
-  for (var i = 0; i < this._칠밀림.length; i++) {
-    var e = this._칠밀림[i], m = e._밀린칠;
+  /* ★ 정본 400 — 카메라·화면·목록이 지난번 잰 뒤 그대로면 다시 안 잰다 (보이는 조각이 그대로다)
+   *   ☠ 날씨가 바뀌면 화면 밖 조각 수백 개(2-4A 762개)가 이 목록에 남아, 매 장 하나하나 getBoundingClientRect 로 쟀다 —
+   *     화면에 안 들어오면 목록이 영영 안 빈다(3D 에선 그 조각들이 숨어 있어 절대 안 빈다) · 휴대폰 흉내(CPU×6) 장마다 3ms 를 계속 썼다
+   *     (사장님 11-23 「날씨 전환 심각해. 도저히 플레이 불가능할 정도로 느려져.」 · 휴대폰)
+   *   열쇠 = 월드 변환(카메라·기울기·배율·흔들림) · 원근 · 호스트 class(3D 켬) · 창 크기 바뀐 횟수 · 새로 민 횟수 · 맵 가리기
+   *   (이 조각들의 보임을 바꾸는 것은 이것뿐이다 — visibility 숨김은 위치 재기와 상관없다)
+   *   ★ 열쇠가 같으면 아예 안 잰다 — 2D 는 카메라가 조금만 움직여도(유닛 맞춤·스크롤·흔들림) 통째로 다시 잰다
+   *   ☠ 0.5초마다 통째로(1,346개 약 45ms) · 8장마다 32개씩 돌아가며(한 번 약 6ms — 재기 전에 배치를 다시 계산한다) 모두 그 장이 튀었다(휴대폰 흉내) · 끄기 window.__밀린칠매번 */
+  var 열쇠 = (this._wiTf || '') + '|' + (this._wiP || '') + '|' + (this.host ? this.host.className : '') + '|' +
+            창크기바뀜 + '|' + (this._밀림판 | 0) + '|' + (this._맵가림 ? 1 : 0);
+  if (!root.__밀린칠매번 && 열쇠 === this._밀린칠열쇠) return;
+  var 목 = this._칠밀림, 시작 = 0, 끝 = 목.length;
+  var 남 = 목.slice(0, 시작);
+  for (var i = 시작; i < 끝; i++) {
+    var e = 목[i], m = e._밀린칠;
     if (!m || !e.isConnected) continue;
     if (창안인가(e)) {
       try { if (m.fn) m.fn(); else { 확대판조각칠하기(m.판, m.pal, m.c, m.sx, m.sy, m.w, m.h); e._칠한팔 = m.pal; } }
@@ -4544,7 +4599,13 @@ Renderer.prototype._밀린칠하기 = function () {
     }
     else 남.push(e);
   }
+  for (var j = 끝; j < 목.length; j++) 남.push(목[j]);
+  if (this._칠밀림 !== 목) { for (var k = 0; k < this._칠밀림.length; k++) if (남.indexOf(this._칠밀림[k]) < 0) 남.push(this._칠밀림[k]); }   /* 칠하는 사이 새로 민 것 */
+  if (남.length !== this._칠밀림.length) this._칠밀림모음 = new Set(남);   /* 뺀 것이 있을 때만 집합을 다시 */
   this._칠밀림 = 남;
+  /* 다 잰 뒤의 열쇠 — 칠하는 사이 새로 밀었으면(_밀림판이 바뀜) 다음 장에 다시 통째로 */
+  this._밀린칠열쇠 = (this._wiTf || '') + '|' + (this._wiP || '') + '|' + (this.host ? this.host.className : '') + '|' +
+                    창크기바뀜 + '|' + (this._밀림판 | 0) + '|' + (this._맵가림 ? 1 : 0);
 };
 Renderer.prototype._바닥캔버스칠하기 = function (cv) {
   if (!cv || !this.floorLayer) return this;
@@ -8626,6 +8687,15 @@ Renderer.prototype._범위리맵다시 = function () {
  *   ⇒ 접는선 아래 칸은 tileLayer 안 캔버스 하나에 그룹 그림이 바뀐 칸만 다시 칠한다(접는선 위 배경벽 칸만 예전 요소 길). */
 Renderer.prototype.애니판그룹 = function (그룹, 타일, 칸목) {
   if (typeof document === 'undefined' || !this.tileLayer || !this.nmap) return false;
+  /* ★ 정본 400 — 3D 에서는 타일층(g2-tilelayer3d)·배경벽이 숨어 이 판이 안 보인다(3D 바닥은 WebGL 이 따로 그린다) — 그리지 않고 무엇을 그릴지만 적어 둔다
+   *   ☠ 팔레트 걸음마다·물 애니 틱마다 타일을 xBRZ 로 키워 큰 판에 다시 칠했다(휴대폰 흉내 2-4A 날씨 전환 1.5초에 949ms · 사장님 11-23 「날씨 전환 심각해…」)
+   *   다시 보이면(3D 끔) 지난 그림 기록이 없어 다음 애니 틱·팔레트 걸음에 곧바로 그린다 · 끄기 window.__숨은애니판도그림 */
+  if (!root.__숨은애니판도그림 && this.host && this.host.classList && this.host.classList.contains('g2-3d맵') &&
+      this.tileLayer.classList && this.tileLayer.classList.contains('g2-tilelayer3d')) {
+    (this._애니판목록 || (this._애니판목록 = {}))[그룹] = { 타일: 타일 | 0, 칸목: 칸목 };
+    if (this._애니판타일) delete this._애니판타일[그룹];
+    return true;
+  }
   var src = this.tileCanvas(타일);
   if (!src) return false;
   var 논w = src.논리w || src.width, N = Math.max(1, Math.round(src.width / (논w || TW)));
@@ -9041,6 +9111,15 @@ Renderer.prototype.addMarkTop = function (x, y, cls, color) {
       var b = 유[k]; if (!b || !b.style || b.style.display === 'none' || b._left == null || b._ground == null) return;
       var w = parseFloat(b.style.width) || 0, h = b._h || 0; if (!(w > 0 && h > 0)) return;
       목.push({ l: b._left, t: b._ground - h, r: b._left + w, b: b._ground });
+    });
+    /* 정본 412 — 보물 상자도 오려 낸다 (11-23 사장님 「이동하이라이트에 상자도 덮히는 문제가 있어. 상자는 가려지면 안돼」 · 「북극광 던전 진입후 북쪽 잠긴상자」 = 3-3_GS DUN08 (71,11) 덮인 칸)
+     *   상자의 실제 왼위 = 자리 + 여백(앵커를 margin 으로 민다 · _빌보드놓기 h=0) */
+    var 보 = this._itemEls || {};
+    Object.keys(보).forEach(function (k) {
+      var e = 보[k]; if (!e || !e.style || e.style.display === 'none' || e._left == null || e._ground == null) return;
+      var w = parseFloat(e.style.width) || 0, h = parseFloat(e.style.height) || 0; if (!(w > 0 && h > 0)) return;
+      var l = e._left + (parseFloat(e.style.marginLeft) || 0), t = e._ground - (e._h || 0) + (parseFloat(e.style.marginTop) || 0);
+      목.push({ l: l, t: t, r: l + w, b: t + h });
     });
     this._표식위유닛 = 목;
   }

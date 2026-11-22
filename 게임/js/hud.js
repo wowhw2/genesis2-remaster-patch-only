@@ -1635,6 +1635,22 @@ Hud.prototype._조합형글자외곽선 = function (ctx, s, cx, y, colorIdx, sha
   if (rightX != null && chars.length > 1) { leftX = 2 * cx - rightX; step = (rightX - leftX - lastW) / (chars.length - 1); }
   else { leftX = Math.round(cx - W / 2); }
   var maskW = (rightX != null) ? Math.max(1, Math.ceil(rightX - leftX)) : W;
+  /* ★ 정본 400 — 같은 글자·폭·간격·두 색·스케일러면 지난번 색 입힌 두 장을 그대로 쓴다
+   *   ☠ 매 장 매 글자마다 캔버스를 새로 만들고 점 하나하나 fillRect 로 글자 모양을 만든 뒤 색을 입혔다(스케일러가 없으면 결과도 안 기억)
+   *     휴대폰 기록(11-23 · 갤럭시 S24 · 3-4 전투 적 차례) HUD 한 장 평균 65ms · 3초 넘게 15fps · 끄기 window.__외곽글자캐시끔 */
+  var 셋S = root.G2Scaler, 셋키 = null, 셋칸 = null;
+  var sh색 = this.assets.color(shadowIdx == null ? 0 : shadowIdx), ink색 = this.assets.color(colorIdx == null ? 1 : colorIdx);
+  if (!root.__외곽글자캐시끔) {
+    셋칸 = this._외곽글자캐시 || (this._외곽글자캐시 = new Map());
+    셋키 = s + '|' + maskW + '|' + step + '|' + sh색 + '|' + ink색 + '|' + (셋S && 셋S.cur ? 셋S.cur() + (셋S.N ? 셋S.N() : '') : '') + '|' + (this._ascii ? 1 : 0);
+    var 셋 = (셋칸._글꼴 === font) ? 셋칸.get(셋키) : null;
+    if (셋) {
+      var x0c = Math.round(leftX), 여덟c = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+      for (var c8 = 0; c8 < 8; c8++) ctx.drawImage(셋.sh, x0c + 여덟c[c8][0], y + 여덟c[c8][1]);
+      ctx.drawImage(셋.ink, x0c, y);
+      return this;
+    }
+  }
   var mc = document.createElement('canvas'); mc.width = maskW; mc.height = 16;
   var mg = mc.getContext('2d'); mg.fillStyle = '#fff';
   var xseq = 0;
@@ -1649,8 +1665,12 @@ Hud.prototype._조합형글자외곽선 = function (ctx, s, cx, y, colorIdx, sha
   }
   var x0 = Math.round(leftX);
   mc._키 = 'O' + s + '|' + maskW + '|' + step;      /* Z-44 — 글자·자리가 같으면 같은 그림 */
-  var sh = this._마스크색입히기(mc, this.assets.color(shadowIdx == null ? 0 : shadowIdx));
-  var ink = this._마스크색입히기(mc, this.assets.color(colorIdx == null ? 1 : colorIdx));
+  var sh = this._마스크색입히기(mc, sh색);
+  var ink = this._마스크색입히기(mc, ink색);
+  if (셋키) {
+    if (셋칸._글꼴 !== font || 셋칸.size > 400) { 셋칸.clear(); 셋칸._글꼴 = font; }   /* 글꼴이 바뀌거나 너무 커지면 비운다 */
+    셋칸.set(셋키, { sh: sh, ink: ink });
+  }
   /* ★★★★★ **외곽선은 8방향이다 — 대각선도 찍는다** (2026-08-25 · `0x5DC38`)
    *
    *   원본 `0x5DBC6` 은 `[0xB75F8]`(모드)로 갈라지고, **모드 4 = 외곽선 글자**다
