@@ -317,29 +317,43 @@
     var w = Math.max(1, R.host.clientWidth), h = Math.max(1, R.host.clientHeight);
     if (s.캔버스.width !== w || s.캔버스.height !== h) { s.장면.크기(w, h); s.가림.크기(w, h); }
     else s.장면.그리기();
-    표식3D(R, s);                              /* 장면 깊이가 남아 있을 때 — 범위 표식을 땅에 눕혀 그린다 */
+    var _성0 = root.G2성능 ? performance.now() : 0;
+    표식3D(R, s);
+    if (_성0) root.G2성능.더하기('3D:표식3D', performance.now() - _성0);                              /* 장면 깊이가 남아 있을 때 — 범위 표식을 땅에 눕혀 그린다 */
     /* 가림판은 커서 층(overlay) 바로 앞(아래) — 유닛만 앞 건물·나무에 가리고 커서 박스는 늘 보인다 (10-24 · 맨 위 연출층도 안 가림) */
     var 뒤 = R.overlayLayer && R.overlayLayer.parentNode === R.host ? R.overlayLayer : null;
     /* (10-24) 커서 층 «아래»로 — 선택 박스는 건물에 안 가리고 늘 보인다 (사장님 「선택박스는 보여야하는데 박스도 가려져」) */
     if (뒤 && 뒤.previousSibling !== s.가림캔버스) R.host.insertBefore(s.가림캔버스, 뒤);
     현재돌 = (R.cam && R.cam.rot) || 0; 현재기울 = (R.cam && R.cam.tilt) || 0;
+    /* [개발] 성능 그래프 세부(정본 400) — 꺼져 있으면 G2성능 이 없거나 재기만 하고 그리지 않는다 */
+    var 성 = root.G2성능, 잰 = 성 ? performance.now() : 0, 잼 = function (키) { if (!성) return; var n = performance.now(); 성.더하기(키, n - 잰); 잰 = n; };
     s.사각 = 유닛띄우기(R, s);                 /* 점검용으로 남긴다 */
+    잼('3D:유닛');
     R.host.querySelectorAll('.g2-unit').forEach(function (st) { if (st._3d본체) 파편무대맞추기(st); });
+    잼('3D:파편');
     s.유닛사각수 = s.사각.length;              /* 가림다시() 가 유닛 상자만 갈아 끼운다 */
     표식띄우기(R, s);
+    잼('3D:표식');
     연출띄우기(R, s);
+    잼('3D:연출');
     try { 화면판맞추기(R, s); s.화면판오류 = null; } catch (e화면판) { s.화면판오류 = String(e화면판 && e화면판.stack || e화면판).slice(0, 300); }
+    잼('3D:화면판');
     커서띄우기(R, s);
+    잼('3D:커서');
     /* 가림판보다 아래 층(월드·월드 아래)의 맵 위 연출도 유닛처럼 — 앞 줄 건물·나무에 가린다 (맨 위 연출층은 가림판 위라 그대로) */
     연출자리(R, s).forEach(function (q) { s.사각.push(q); });
+    잼('3D:연출자리');
     s.가림그린 = s.가림.가림그리기(s.사각);
+    잼('3D:가림그림');
     /* 유닛 아래 화면 층(fxScreenUnderLayer — 문라이트 어두운 막 등)에 판이 있으면 가림판을 감춘다 (10-24)
      *   사장님 「문라이트에 타겟 캐릭터에 오브젝트가 같이 묶여서 그려지는 것도」 — 맵·오브젝트는 그 막 아래인데 가림판은 유닛 위라,
      *   가림판이 그린 앞 덤불·나무가 막을 안 받은 원래 색 네모로 유닛 위에 떴다 */
     var 아래막 = false, 막층 = R.fxScreenUnderLayer;
     if (막층) for (var mi = 0; mi < 막층.children.length && !아래막; mi++) { var me = 막층.children[mi]; if (me.offsetWidth && me.style.display !== 'none') 아래막 = true; }
     if ((s.가림캔버스.style.visibility === 'hidden') !== 아래막) s.가림캔버스.style.visibility = 아래막 ? 'hidden' : '';
+    잼('3D:아래막');
     try { 색필터(R, s); } catch (e색) {}
+    잼('3D:색필터');
   }
 
   /* ── 암전·팔레트 바꿈을 3D 맵에도 (10-19 사장님 「그리고 초필살기 암전이 적용이 안돼. 팔레트 스왑도 마찬가지일걸로 생각돼. 이부분도 처리해야해」) ──

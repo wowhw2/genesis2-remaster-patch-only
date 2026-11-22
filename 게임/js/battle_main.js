@@ -16907,7 +16907,9 @@
       while (상태효과틱 >= 30 * G2Anim.TICK_MS - 1e-6) { 상태효과틱 -= 30 * G2Anim.TICK_MS; if (R.정기갱신끔) continue; try { R.tickAilmentFx(); } catch (e상효) {} }   /* [0x70006]=0 이면 0x10238 이 0x12065 를 안 부른다 */
     }
     /* 게임 프레임 시계 — 카메라 스크롤과 유닛 걷기를 같은 tick 에서 굴립니다 */
+    var _성t = window.G2성능 ? performance.now() : 0;   /* [개발] 성능 그래프 Game — 정본 400 */
     pumpFrames(dt);
+    if (_성t) window.G2성능.더하기('논리', performance.now() - _성t);
     /* 표시 보간 — 이동 중에는 매 rAF 다시 그려 프레임 사이를 채웁니다.
      * (논리는 pumpFrames 가 원본 주기로만 굴립니다) */
     if (R.lerpOn && (frameWaiters.length || R.카메라이동중인가())) R.apply();
