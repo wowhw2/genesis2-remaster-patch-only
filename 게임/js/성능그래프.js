@@ -55,6 +55,9 @@
     if (root.G2Fx) { 감싸기(root.G2Fx, 'draw', '효과그림'); 감싸기(root.G2Fx, 'update', '효과갱신'); 감싸기(root.G2Fx, '날씨칠하기', '효과그림'); }
     if (root.G2Ring) 감싸기(root.G2Ring, 'draw', '링');
     if (root.__셸) { 감싸기(root.__셸, '한걸음', '셸'); 감싸기(root.__셸, '렌더', '셸'); }
+    /* 날씨가 바뀌면 이펙트 그림을 새 팔레트로 다시 굽는다(toDataURL) — 비 시작 끊김 후보 (정본 400) */
+    if (root.G2Fx) 감싸기(root.G2Fx, '날씨적용', '날씨굽기');
+    if (수집) 수집.걸기();
   }
   setInterval(걸기, 1000);
 
@@ -76,6 +79,7 @@
     줄.Draw = 줄.표시 + 줄.HUD + 줄.링 + 줄.효과그림;   /* 3D 는 표시 안쪽이라 따로 안 더한다 */
     줄.GPU = Math.max(0, dt - 줄.Game - 줄.Draw);
     기록.push(줄);
+    if (수집) 수집.장(줄);   /* 정본 408 */
     if (기록.length > 길이) { 기록.shift(); 히치 = 히치.map(function (i) { return i - 1; }).filter(function (i) { return i >= 0; }); }
     if (dt > 50) {
       히치.push(기록.length - 1);
@@ -124,6 +128,172 @@
   requestAnimationFrame(한장);
   addEventListener('keydown', function (e) { if (e.key === 'F9') { API.켜기(!켬); e.preventDefault(); } }, true);
 
+  /* ── 정본 408 — 성능 수집: 끊김·느림이 나면 «그 순간» 앞뒤 수치와 하던 일을 묶어 두고, 게임이 한가할 때 신고 받는 곳으로 보낸다 ──
+   *   사장님 11-22 「지금 패치로 다른사람들 실행기에 넣고(그래프는 띄우지는 않고 측정 기능만 넣고) 문제 상황이 생기면 자동으로 해당 상황과
+   *   수치 등을 전송해서 데이터 수집을 할 수 없냐는 소리야.」·「지금 비정상 종료처럼」·「그래프는 띄우면 게임에 방해되니까 띄우지 말고」·
+   *   「계속 보내지거나 그래서 게임에 지장생기지는 않을까?」 · 고르심 «켜 둠 + 끄는 칸»(게임 설정 › 일반 › 성능 기록 보내기)
+   *   ★ 기록은 그 자리에서(그때 돌던 연출 · 장면 · 입력 · 앞뒤 프레임) · 보내기는 나중에 한가할 때 — 보내는 일이 끊김을 보태지 않게
+   *   ★ 보내는 것은 앱(PC)·휴대폰에서만 — 개발 브라우저·헤드리스 시험은 모으기만 하고 안 보낸다
+   *   한도: 같은 까닭은 한 번 켤 때 한 번 · 잡기 20초에 한 번 · 한 번 켤 때 6건 · 보내기 3분에 한 번 · 한 번 켤 때 3번 · 하루 8번 */
+  var 수집 = (function () {
+    var 켬2 = true; try { if (localStorage.getItem('g2.성능수집') === '0') 켬2 = false; } catch (e) { }
+    var 모바일 = /[?&]모바일=1/.test(물음), 보냄가능 = false;
+    try { 보냄가능 = (!!root.G2앱 || 모바일) && !navigator.webdriver; } catch (e) { }
+    var 받는곳 = 'https://script.google.com/macros/s/AKfycbyWAiC12QPSOFv7RvUnGeJSHEbyY1YHKQQeD7mR_6XUlIhv3WrGmR-zCyBgBLtvotZU/exec';   /* bug_report.js 휴대폰신고주소 와 같게 */
+    var 히치ms = 66, 느림ms = 40;   /* 히치 = 한 장이 60fps 네 장 넘게 걸림 · 느림 = 1초 평균이 25fps 아래로 3초 넘게 */
+    var 최근일 = [], 대기 = [], 잡은까닭 = {}, 잡은수 = 0, 마지막잡기 = -1e9, 마지막보냄 = -1e9, 보낸수 = 0, 잡는중 = null;
+    var 도는 = {}, 도는번 = 0, 앞상황 = '', 앞장면 = '', 장면바뀐때 = performance.now(), 앞패드 = '';
+    var 초합 = 0, 초장 = 0, 초시작 = 0, 느린초 = 0;
+    function 일(글) {
+      글 = String(글).slice(0, 160);
+      var 끝 = 최근일[최근일.length - 1], t = performance.now();
+      if (끝 && 끝.일 === 글) { 끝.n = (끝.n || 1) + 1; 끝.끝t = t; return; }
+      최근일.push({ t: t, 일: 글 }); if (최근일.length > 80) 최근일.shift();
+    }
+    function 짧게(p) {
+      if (p == null) return '';
+      if (typeof p !== 'object') return String(p);
+      var o = [];
+      for (var k in p) { var v = p[k]; if (v == null || typeof v === 'object' || typeof v === 'function') continue; o.push(k + '=' + v); if (o.length >= 6) break; }
+      return o.join(' ');
+    }
+    function 상황() {
+      var o = {};
+      try { o.셸 = root.__셸 && root.__셸.수명주기 ? root.__셸.수명주기().화면 || '' : ''; } catch (e) { }
+      try { var G = root.G2; o.맵 = G && G.scene ? G.scene._시나리오 || G.scene['맵파일'] || '' : ''; } catch (e) { }
+      try { if (root.ctrl) o.모드 = root.ctrl.mode; } catch (e) { }
+      try { var b = root.battle; if (b) o.턴 = b.turn + '/' + b.phase; } catch (e) { }
+      try { o.보기3D = localStorage.getItem('리마스터3D보기') || ''; } catch (e) { }
+      try { var F = root.G2Fx; if (F) { o.날씨 = F.wKind + ':' + F.wStep; o.이펙트 = (F.active ? F.active.length : 0) + (F.screenActive ? F.screenActive.length : 0); } } catch (e) { }
+      return o;
+    }
+    /* 하던 일 — 연출 입구(G2Anim play)·이펙트 재생(G2Fx play)·키·누름·패드를 시각과 함께 (값을 바꾸지 않고 적기만) */
+    function 걸기2() {
+      var A = root.G2Anim && root.G2Anim.Anim;
+      if (A && A.prototype.play && !A.prototype.play.__수집) {
+        var 원 = A.prototype.play;
+        A.prototype.play = function (kind, payload) {
+          var 번 = ++도는번, 이름 = kind + (payload ? ' ' + 짧게(payload) : '');
+          도는[번] = 이름; 일('연출 ' + 이름);
+          var 끝 = function () { delete 도는[번]; };
+          var p;
+          try { p = 원.apply(this, arguments); } catch (e) { 끝(); throw e; }
+          if (p && typeof p.then === 'function') p.then(끝, 끝); else 끝();
+          return p;
+        };
+        A.prototype.play.__수집 = true;
+      }
+      var F = root.G2Fx;
+      if (F && typeof F.play === 'function' && !F.play.__수집) {
+        var 원2 = F.play;
+        F.play = function (name) { 일('이펙트 ' + name); return 원2.apply(this, arguments); };
+        F.play.__수집 = true;
+      }
+    }
+    addEventListener('keydown', function (e) { if (!e.repeat) 일('키 ' + e.key); }, true);
+    addEventListener('pointerdown', function (e) { 일('누름 ' + (e.pointerType || '')); }, true);
+    setInterval(function () {
+      if (!켬2 || document.hidden) return;
+      var o = 상황(), 글 = JSON.stringify(o), 면 = (o.셸 || '') + ' ' + (o.맵 || '');
+      if (글 !== 앞상황) { 앞상황 = 글; 일('상황 ' + 글); }
+      if (면 !== 앞장면) { 앞장면 = 면; 장면바뀐때 = performance.now(); }
+      try {
+        var ps = navigator.getGamepads ? navigator.getGamepads() : [], 눌 = [];
+        for (var i = 0; i < ps.length; i++) { var p = ps[i]; if (!p) continue; p.buttons.forEach(function (b, j) { if (b.pressed) 눌.push(j); }); }
+        var 패 = 눌.join(','); if (패 !== 앞패드) { 앞패드 = 패; if (패) 일('패드 ' + 패); }
+      } catch (e) { }
+    }, 500);
+
+    function 짧은줄(줄, 기준) {
+      var r = [Math.round(줄.때 - 기준), +줄.Frame.toFixed(1), +줄.Game.toFixed(1), +줄.Draw.toFixed(1), +줄.GPU.toFixed(1)], 세 = {};
+      if (줄.Frame <= 25) return r;   /* 고른 장은 큰 넷만 — 세부는 느린 장에만 (휴대폰 데이터 · 사장님 11-22 「전송하는 데이터 용량이 크진 않아?」) */
+      세부.forEach(function (k) { if (줄[k] > 0.2) 세[k] = +줄[k].toFixed(1); });
+      r.push(세); return r;
+    }
+    function 이상(까닭, 줄) {
+      var t = 줄.때;
+      if (잡는중) { if (잡는중.까닭.length < 8) 잡는중.까닭.push(까닭 + ' @' + Math.round(t - 잡는중.t)); return; }
+      if (잡은수 >= 6 || t - 마지막잡기 < 20000) return;
+      var 큰 = '', 큰값 = 0; 세부.forEach(function (k) { if (줄[k] > 큰값) { 큰값 = 줄[k]; 큰 = k; } });
+      var 연출 = Object.keys(도는).map(function (k) { return 도는[k]; });
+      var o = 상황(), 키 = 까닭.split(' ')[0] + '|' + o.셸 + '|' + o.맵 + '|' + 큰 + '|' + (연출[0] || '').split(' ')[0];
+      if (잡은까닭[키]) return;
+      잡은까닭[키] = 1; 마지막잡기 = t;
+      잡는중 = { 때: new Date().toISOString(), t: t, 까닭: [까닭], 큰구간: 큰, 상황: o, 도는연출: 연출,
+                 장면바뀐뒤ms: Math.round(t - 장면바뀐때), 켠뒤초: Math.round(t / 1000) };
+      setTimeout(마무리, 1500);   /* 뒤 1.5초까지 담는다 — 끊김이 이어지는지 */
+    }
+    function 마무리() {
+      var c = 잡는중; 잡는중 = null; if (!c) return;
+      c.프레임머리 = ['ms(이상 기준)', 'Frame', 'Game', 'Draw', 'GPU', '세부'];
+      c.프레임 = 기록.filter(function (줄) { return 줄.때 >= c.t - 3000; }).map(function (줄) { return 짧은줄(줄, c.t); });
+      c.하던일 = 최근일.filter(function (x) { return (x.끝t || x.t) >= c.t - 15000; }).map(function (x) { return Math.round(x.t - c.t) + 'ms ' + x.일 + (x.n ? ' ×' + x.n : ''); });
+      delete c.t;
+      대기.push(c); 잡은수++;
+      try { console.warn('[성능 수집] ' + c.까닭[0] + ' · ' + (c.상황.셸 || '') + ' ' + (c.상황.맵 || '') + ' · 큰 구간 ' + c.큰구간 + ' · 연출 ' + (c.도는연출.join(' / ') || '없음')); } catch (e) { }
+    }
+    function 장(줄) {
+      if (!켬2) return;
+      if (document.hidden) { 초장 = 0; 느린초 = 0; return; }
+      var dt = 줄.Frame;
+      if (dt > 1500) { 초장 = 0; return; }   /* 뒤에 갔다 돌아온 틈 · 멈춘 창 — 끊김이 아니다 */
+      if (dt > 히치ms) 이상('히치 ' + Math.round(dt) + 'ms', 줄);
+      if (!초장) 초시작 = 줄.때;
+      초합 += dt; 초장++;
+      if (줄.때 - 초시작 >= 1000) {
+        var 평 = 초합 / 초장; 초합 = 0; 초장 = 0;
+        느린초 = 평 > 느림ms ? 느린초 + 1 : 0;
+        if (느린초 >= 3) { 이상('느림 ' + Math.round(1000 / 평) + 'fps(3초 넘게)', 줄); 느린초 = 0; }
+      }
+    }
+
+    /* 보내기 — 한가할 때만(최근 60장 평균 25ms 아래 · 도는 연출 없음 · 마지막 잡기 10초 뒤) · 뒤로 넘어갈 때는 남은 것을 곧바로 */
+    function 오늘() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+    function 하루수(더) {
+      var 키 = 'g2.성능수집.날', v = { 날: 오늘(), n: 0 };
+      try { var j = JSON.parse(localStorage.getItem(키) || 'null'); if (j && j.날 === v.날) v = j; } catch (e) { }
+      if (더) { v.n += 더; try { localStorage.setItem(키, JSON.stringify(v)); } catch (e) { } }
+      return v.n;
+    }
+    function 보낼수있나() { return 보냄가능 && 켬2 && 대기.length > 0 && 보낸수 < 3 && 하루수(0) < 8; }
+    function 보내기() {
+      if (!보낼수있나()) return false;
+      var 신고 = root.G2버그신고; if (!신고 || !신고._zip || !신고._바64) return false;
+      var 묶 = 대기.splice(0, 대기.length); 보낸수++; 마지막보냄 = performance.now(); 하루수(1);
+      try {
+        var 정보 = 신고.모으기('성능 기록(저절로) — ' + 묶.map(function (c) { return c.까닭[0]; }).join(' · '));
+        var 엔 = new TextEncoder(), 때 = new Date(), 붙 = function (n) { return (n < 10 ? '0' : '') + n; };
+        var 이름 = '성능기록_' + (모바일 ? '휴대폰' : 'PC') + '_' + 때.getFullYear() + 붙(때.getMonth() + 1) + 붙(때.getDate()) + '_' + 붙(때.getHours()) + 붙(때.getMinutes()) + 붙(때.getSeconds()) + '.zip';
+        var zip = 신고._zip([
+          { 이름: '성능.json', 바이트: 엔.encode(JSON.stringify(묶)) },
+          { 이름: '정보.json', 바이트: 엔.encode(JSON.stringify(정보, null, 1)) },
+          { 이름: '콘솔끝.txt', 바이트: 엔.encode(신고.기록().slice(-40).join('\n')) }]);
+        var 몸 = JSON.stringify({ 이름: 이름, 설명: String(정보.설명 || '').slice(0, 1000), zip: 신고._바64(zip) });
+        fetch(받는곳, { method: 'POST', mode: 'no-cors', keepalive: 몸.length < 60000, headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: 몸 }).catch(function () { });
+        return 이름;
+      } catch (e) { return false; }
+    }
+    setInterval(function () {
+      if (!보낼수있나() || document.hidden) return;
+      var 지금 = performance.now();
+      if (지금 - 마지막보냄 < 180000 || 지금 - 마지막잡기 < 10000 || 잡는중 || Object.keys(도는).length) return;
+      var 최근 = 기록.slice(-60), 합 = 0; 최근.forEach(function (줄) { 합 += 줄.Frame; });
+      if (!최근.length || 합 / 최근.length > 25) return;
+      (root.requestIdleCallback || function (f) { return setTimeout(f, 0); })(function () { 보내기(); });
+    }, 15000);
+    document.addEventListener('visibilitychange', function () { if (document.hidden && !잡는중) 보내기(); });
+
+    return {
+      걸기: 걸기2, 장: 장, 일: 일,
+      켜짐: function () { return 켬2; },
+      켜기: function (v) { 켬2 = !!v; try { localStorage.setItem('g2.성능수집', 켬2 ? '1' : '0'); } catch (e) { } if (!켬2) 대기.length = 0; return 켬2; },
+      대기: function () { return 대기.slice(); },
+      최근일: function () { return 최근일.slice(); },
+      보낼수있나: function () { return !!보낼수있나(); },
+      _보내기: 보내기, _마무리: 마무리, _이상: 이상
+    };
+  })();
+
   var API = {
     켜짐: function () { return 켬; },
     켜기: function (v) { 켬 = !!v; try { localStorage.setItem('g2.성능', 켬 ? '1' : '0'); } catch (e) { } if (!켬 && 판) 판.style.display = 'none'; return 켬; },
@@ -137,6 +307,7 @@
     /** 최근 n 프레임 중 가장 긴 프레임과 그 내역 */
     최악: function (n) { var 최근 = 기록.slice(-(n || 300)), m = null; 최근.forEach(function (줄) { if (!m || 줄.Frame > m.Frame) m = 줄; }); return m; },
     걸기: 걸기,
+    수집: 수집,   /* 정본 408 */
     /** 바깥에서 잰 구간을 이 프레임에 더한다(전투 논리 pumpFrames 등) */
     더하기: function (키, ms) { if (!(키 in 누적)) { 누적[키] = 0; if (세부.indexOf(키) < 0) 세부.push(키); } 누적[키] += ms; }   /* 처음 보는 키는 세부에 더한다(3D 세부 등) */
   };
