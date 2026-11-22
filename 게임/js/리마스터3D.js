@@ -413,14 +413,22 @@
     var 사각 = [], 호 = R.host.getBoundingClientRect(), H = (s.장면.지정() || {}).H || 200;
     var 상자들 = R.unitEls || {};
     s.유닛표 = null;
-    for (var k in 상자들) {
-      var box = 상자들[k], u = box && box._unit;
-      if (!box || !u || box.style.display === 'none') continue;
-      var 닻 = 유닛닻(R, s, box);
-      세우기(R, s, box, 닻);
+    /* ★ 정본 400 — 쓰기(세우기)를 먼저 다 하고 읽기(그림사각 = getBoundingClientRect)를 모아서 한다
+     *   ☠ 유닛마다 «세우기 → 읽기»를 번갈아 하면 읽을 때마다 브라우저가 레이아웃을 다시 계산한다(레이아웃 스래싱 · 유닛 36 이면 한 장에 36 번)
+     *   에뮬레이터 3D 스크롤 프로파일: getBoundingClientRect 14.8% · 표시 23ms 중 3D 장면·가림 4ms 뿐 · 각 유닛 사각형은 제 변환에만 달려 결과는 같다 */
+    var 세운 = [];
+    for (var k0 in 상자들) {
+      var box0 = 상자들[k0], u0 = box0 && box0._unit;
+      if (!box0 || !u0 || box0.style.display === 'none') continue;
+      var 닻0 = 유닛닻(R, s, box0);
+      세우기(R, s, box0, 닻0);
       /* HUD(체력 숫자) — 그 유닛을 닻으로 (원본 화면에서 머리 위에 있던 자리가 그 유닛 발줄 위 높이가 된다) */
-      var 값 = R.valueEls && R.valueEls[u.id];
-      if (값 && 값.style.display !== 'none') { 세우기(R, s, 값, 닻); 값._3d유닛값 = true; }
+      var 값 = R.valueEls && R.valueEls[u0.id];
+      if (값 && 값.style.display !== 'none') { 세우기(R, s, 값, 닻0); 값._3d유닛값 = true; }
+      세운.push({ box: box0, u: u0, 닻: 닻0 });
+    }
+    for (var si = 0; si < 세운.length; si++) {
+      var box = 세운[si].box, u = 세운[si].u, 닻 = 세운[si].닻;
       var r = 그림사각(box);
       if (r.width < 1 || r.height < 1) continue;
       var 줄 = Number.isFinite(box._row) ? box._row : (u.y | 0);
@@ -481,6 +489,7 @@
     else if (box.style.transform !== tf) box.style.transform = tf;
     box._3d국 = tf; box._3d들림 = 닻.높 || 0; box._3d닻 = 닻;
     if (s.세운것) s.세운것.add(box);
+    if (box._unit && 개발판()) 높이감시(R, s, box, 닻);
     그림자제자리(box);
   }
   /* ★ 구조물 판 — 축대 면 기울기 (2026-10-28)
@@ -872,6 +881,34 @@
     s._서는표 = 표; s._서는표수 = s.높이수; return 표;
   }
   function 칸높이(s, x, y) { var 표 = 서는표(s); if (표 && x >= 0 && y >= 0 && x < 표.W && y < 표.H) return 표.높[y * 표.W + x]; return s.장면.높이(x + 0.5, y * 16 + 8) || 0; }
+  /* ★ 높이 감시 — 개발판(브라우저 · 앱·휴대폰 아님)에서만 · 유닛 높이가 한 번 갱신되는 사이에 반 층 넘게 뛰면 그 순간을 기록한다 (정본 353)
+   *   사장님 11-22 「전투는 내가 가도 테스트가 힘들어」·「어차피 pc에서 사용해도 부하는 걸릴테니」·「저상태에서 문제 생겼을때 자동으로 기록하게해」
+   *   · 남기는 곳: 브라우저 저장소 'G2가림높이감시'(최근 200 · 새로고침해도 남음) + 콘솔 경고(F8 버그 신고에 실림) · 꺼내기 G2가림높이감시.기록() · 비우기 .비우기()
+   *   · 두 칸 넘게 옮긴 것(순간이동·배치)·높이 설정을 바꾼 직후는 뺀다 */
+  var 개발판값 = null;
+  function 개발판() {
+    if (개발판값 == null) { var 물 = ''; try { 물 = decodeURIComponent(String(location.search || '')); } catch (e) { 물 = String(location.search || ''); } 개발판값 = !root.G2앱 && !/[?&]모바일=1/.test(물); }
+    return 개발판값;
+  }
+  var 감시키 = 'G2가림높이감시';
+  function 감시남기기(줄) {
+    var 목 = []; try { 목 = JSON.parse(root.localStorage.getItem(감시키) || '[]') || []; } catch (e) { 목 = []; }
+    목.push(줄); if (목.length > 200) 목.splice(0, 목.length - 200);
+    try { root.localStorage.setItem(감시키, JSON.stringify(목)); } catch (e) { }
+    try { console.warn('[가림높이 감시] ' + JSON.stringify(줄)); } catch (e) { }
+  }
+  function 높이감시(R, s, box, 닻) {
+    var u = box._unit, h = +닻.높 || 0, x = u.x | 0, y = u.y | 0, 앞 = box._감시;
+    box._감시 = { h: h, x: x, y: y, 수: s.높이수 };
+    if (!앞 || 앞.수 !== s.높이수 || Math.abs(앞.x - x) + Math.abs(앞.y - y) > 1) return;
+    var 한층 = (s.높이 || 100) / 2;
+    if (Math.abs(h - 앞.h) <= 한층 / 2) return;
+    var 둘레 = {}; [[0, 0], [0, -1], [0, 1], [-1, 0], [1, 0]].forEach(function (d) { 둘레[d[0] + ',' + d[1]] = Math.round(s.장면.높이(x + d[0] + 0.5, (y + d[1]) * 16 + 8) || 0); });
+    감시남기기({ 때: new Date().toISOString(), 맵: s.이름, 시나리오: (function () { try { return new URLSearchParams(location.search).get('sce'); } catch (e) { return null; } })(), 유닛: String(u.name || '').trim(), 편: u.side,
+      칸: [x, y], 앞칸: [앞.x, 앞.y], 밀림: [u.ox | 0, u.oy | 0], 높이: [Math.round(앞.h), Math.round(h)], 서는: Math.round(칸높이(s, x, y)), 장면둘레: 둘레,
+      기울기: 현재기울, 회전: 현재돌 });
+  }
+  root.G2가림높이감시 = { 기록: function () { try { return JSON.parse(root.localStorage.getItem(감시키) || '[]'); } catch (e) { return []; } }, 비우기: function () { try { root.localStorage.removeItem(감시키); } catch (e) { } } };
   /* 걸음 높이 — 길 위 점의 땅을 그때그때 재지 않고, 지금 칸과 밀린 쪽 이웃 칸의 서는 높이를 밀린 만큼 잇는다
    *   (칸 경계 턱·절벽 면에서 한 층씩 확 뛰던 것 · 사장님 11-21 「보통 이동할때 그렇게 튀는것 같으니까」) · 이웃이 못 가는 칸이면 지금 칸 높이 */
   function 걸음높이(s, u) {
