@@ -1269,10 +1269,12 @@ function 앞으로차례(battle, 최대라운드) {
   if (!Ru || !Ru.readyTick || !battle) return out;
   (battle.units || []).forEach(function (u) {
     if (!u || !u.alive || (u.side | 0) !== 1 || u.job === 0xA2) return;   /* 0x19B2C */
-    if (controlOf(battle, u) !== 'player') return;                       /* 대기열에 들어오는 아군만 (0x19C01) */
+    /* AI 를 건 아군(조작불가 포함)도 넣는다 — 그 아군은 READY 가 된 라운드에 곧바로 스스로 움직인다(0x44913) · ai 표시로 구분
+     *   (사장님 11-22 「그리고 ai 걸면 안나오는 문제도 있어」 — 전에는 대기열에 들어오는 아군만 넣어 AI 를 걸면 줄에서 빠졌다) */
+    var ai = controlOf(battle, u) !== 'player';
     if ((u.waitCount | 0) === 0xFF) return;                              /* 이미 행동 가능 */
     var s = { job: u.job, wait: u.waitCount | 0, f13: u.stance | 0, f14: u.f14 | 0, f15: u.f15 | 0 };
-    for (var j = 1; j <= 끝; j++) if (Ru.readyTick(s, T)) { out.push({ u: u, r: j, k: Math.ceil(j / N) }); return; }
+    for (var j = 1; j <= 끝; j++) if (Ru.readyTick(s, T)) { out.push({ u: u, r: j, k: Math.ceil(j / N), ai: ai }); return; }
   });
   out.sort(function (a, b) { return a.r - b.r; });
   return out;
