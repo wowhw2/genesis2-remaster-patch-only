@@ -13133,7 +13133,25 @@ Renderer.prototype._유닛돔차례 = function () {
     for (var j = 0; j < 표.length; j++) { p.insertBefore(차[j], 표[j]); p.removeChild(표[j]); }
   });
 };
+/* ★ 정본 400 — apply 몰아 하기: 한 장 안에서 여러 번 불려도 화면에 나가는 것은 마지막 한 번뿐이다
+ *   측정(11-23 · 측정 크롬 2-4A 3D 45도 · 적 걷기 중 994장): apply 가 한 장에 12~20번 몰린 장이 23장 — 상태 알림 refresh(onState) 5번꼴 · 걷기 step · 주 루프
+ *   ⇒ 그 자리들은 apply예약() — 지금 마이크로태스크 묶음이 다 돈 뒤 한 번만 apply 한다(같은 태스크라 화면엔 마지막 상태만 나간다 = 보이는 것 그대로)
+ *   ★ 배속 이어돌기 태스크(그림을 그린 «뒤» 메시지 채널)에서는 미뤄 두고 다음 장 주 루프가 한 번 반영한다(window.__이어도는중) — 거기서 한 apply 는 다음 장 전에 다시 덮여 화면에 안 나갔다
+ *   ★ apply() 를 곧바로 부르면 예약은 지운다 */
+Renderer.prototype.apply예약 = function () {
+  if (root.__apply몰기끔) { this.apply(); return; }   /* 대조군·되돌리기 스위치 */
+  this._apply예약 = true;
+  if (this._apply흘림) return;
+  this._apply흘림 = true;
+  var self = this;
+  (typeof queueMicrotask === 'function' ? queueMicrotask : function (f) { Promise.resolve().then(f); })(function () {
+    self._apply흘림 = false;
+    if (!self._apply예약 || root.__이어도는중) return;
+    self.apply();
+  });
+};
 Renderer.prototype.apply = function () {
+  this._apply예약 = false;
   /* ★★★★★ 정본 254 — 전투가 쥔 지형은 «지금 그리는 맵»의 것이어야 한다 (2026-11-16 사장님 「이벤트로 킬러들이랑 한조 나오는 시나리오인데 한조 위치도 이상해 이동할 수 없는 곳에 나와」·「원작에 저렇게 나오지 않아!」)
    *   ☠ 맵을 로딩 중 미리 지어 넘겨받는 길은 _nativeMap단계 «이동판정»(battle.map · 지형 = 이 맵 layerC)을 안 거쳐, 전투가 부팅 묶음 지형(G2.terrain · 57×53 다른 맵)을 그대로 썼다
    *     실측(측정 창 9-9 · FR04): 지나갈 수 있는 칸이 원본(12~26줄 풀밭)과 통째로 달라 어두운 숲(22~32줄)까지 갈 수 있었고, 방식 1 등장 자리(0x50D3A)도 틀린 판으로 셌다

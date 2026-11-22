@@ -25,7 +25,7 @@
     { 키: 'GPU', 색: '#50a0ff' }
   ];
   var 세부 = ['논리', '셸', '효과갱신', '표시', '3D장면', '3D가림', 'HUD', '링', '효과그림'];
-  var 누적 = {}, 기록 = [], 길이 = 900, 히치 = [], 보는초 = 6;   /* 900 장 — 6초를 120fps 까지 */
+  var 깊이 = {}, 누적 = {}, 기록 = [], 길이 = 900, 히치 = [], 보는초 = 6;   /* 900 장 — 6초를 120fps 까지 */
   세부.forEach(function (k) { 누적[k] = 0; });
 
   /* 함수 감싸기 — 같은 것을 두 번 감싸지 않는다 · 안쪽 중첩은 바깥 구간에도 들어간다(표시 ⊃ 3D) */
@@ -33,8 +33,10 @@
     if (!obj || typeof obj[이름] !== 'function' || obj[이름].__성능) return false;
     var 원 = obj[이름];
     var 새 = function () {
-      var t = performance.now();
-      try { return 원.apply(this, arguments); } finally { 누적[키] += performance.now() - t; }
+      /* 같은 구간이 안에서 다시 불리면(apply → goTile → apply 등) 바깥 한 번만 센다 — 겹쳐 세면 표시가 프레임보다 크게 잡혔다(정본 400 · 11-23) */
+      if (깊이[키]) return 원.apply(this, arguments);
+      깊이[키] = 1; var t = performance.now();
+      try { return 원.apply(this, arguments); } finally { 깊이[키] = 0; 누적[키] += performance.now() - t; }
     };
     새.__성능 = true; 새.__원 = 원;
     obj[이름] = 새; return true;

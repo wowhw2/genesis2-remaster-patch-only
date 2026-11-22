@@ -1858,7 +1858,7 @@
     if (!_이어채널) {
       if (typeof MessageChannel === 'undefined') return;
       _이어채널 = new MessageChannel();
-      _이어채널.port1.onmessage = function () { _이어예약 = false; pumpFrames(0, true); };
+      _이어채널.port1.onmessage = function () { _이어예약 = false; window.__이어도는중 = true; pumpFrames(0, true); };   /* __이어도는중 — 그림 그린 뒤 태스크라 apply예약은 다음 장으로 미룬다(정본 400) */
     }
     _이어예약 = true;
     _이어채널.port2.postMessage(0);
@@ -6391,7 +6391,7 @@
           else          R.cam.cy += st.sign * st.px;
           R.clampCamera();
         }
-        R.updateUnit(u); 상자따라가기(); R.apply();
+        R.updateUnit(u); 상자따라가기(); R.apply예약();   /* 정본 400 — 한 장 안의 여러 걷기·상태 알림 apply 를 마지막 한 번으로(render.js apply예약) */
 
         if (++frame >= st.frames) {
           cur = (cur + 1) & 3;                                 /* 0x15D9E */
@@ -6406,7 +6406,7 @@
             if (st.horiz) u.ox = 0; else u.oy = 0;
             i++; st = null;
           }
-          R.updateUnit(u); 상자따라가기(); R.apply();
+          R.updateUnit(u); 상자따라가기(); R.apply예약();
         }
         /* ★ 게임 프레임 시계로 기다립니다 — 카메라 스크롤과 **같은 tick** 에서
          *   움직여야 상대 위치가 안 흔들립니다(pumpFrames 주석 참고). */
@@ -12788,7 +12788,7 @@
     }
     R.facingGuide(facing);
     drawReadyMarks();
-    R.apply();
+    R.apply예약();   /* 정본 400 — 상태 알림(onState)이 한 장에 여러 번 와도 apply 는 마지막 한 번 */
 
     var u = battle.at(t.x, t.y), d = battle.dateText();
     var cell = (hi && hi.kind === 'move')
@@ -16907,8 +16907,10 @@
       while (상태효과틱 >= 30 * G2Anim.TICK_MS - 1e-6) { 상태효과틱 -= 30 * G2Anim.TICK_MS; if (R.정기갱신끔) continue; try { R.tickAilmentFx(); } catch (e상효) {} }   /* [0x70006]=0 이면 0x10238 이 0x12065 를 안 부른다 */
     }
     /* 게임 프레임 시계 — 카메라 스크롤과 유닛 걷기를 같은 tick 에서 굴립니다 */
+    window.__이어도는중 = false;   /* 정본 400 — rAF 안: 이어돌기 동안 미룬 apply예약을 이 장에서 반영 */
     var _성t = window.G2성능 ? performance.now() : 0;   /* [개발] 성능 그래프 Game — 정본 400 */
     pumpFrames(dt);
+    if (R._apply예약 && R.apply예약) R.apply예약();
     if (_성t) window.G2성능.더하기('논리', performance.now() - _성t);
     /* 표시 보간 — 이동 중에는 매 rAF 다시 그려 프레임 사이를 채웁니다.
      * (논리는 pumpFrames 가 원본 주기로만 굴립니다) */
