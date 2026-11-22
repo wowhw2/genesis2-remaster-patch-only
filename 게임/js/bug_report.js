@@ -279,9 +279,7 @@
   /* ── 정본 409 — 이용 안내(게임 로그 수집) · 처음 켤 때 동의해야 게임 ──
    *   사장님 11-23 「방금 말한거 결국 로그 수집이잖아. 대부분 게임에서 한다는데, 릴리즈 노트처럼 이용약관 간단하게 넣고 게임 로그 수집한다라고 하면 되는거 아니야?」·
    *   「끄는걸 끄고 동의해야 게임할 수있도록 하면 되는거 아닌가?」 · 고르심 «동의해야 게임 (끄는 칸 없음)»
-   *   ★ 앱(PC)·휴대폰만 — 개발 브라우저·헤드리스 시험은 띄우지 않는다(수집도 안 보낸다 · 성능그래프.js)
-   *   ★ 글을 바꾸면 안내판을 올린다 → 다시 동의를 받는다 */
-  var 안내판 = '1';
+   *   ★ 글을 바꾸면 첫 화면 두 곳(앱/설치.html · 모바일/nodejs/설치.html)의 같은 글도 바꾼다 */
   var 이용안내글 = [   /* 사장님 11-23 「멘트 좀 수정해야해;; 너무 ai스러워」 → 흔한 게임 약관 말투로 */
     '창세기전 2 리마스터는 버그 수정과 성능 개선을 위해',
     '게임 이용 중 발생하는 기록(게임 로그)을 수집합니다.',
@@ -307,62 +305,14 @@
     '동의하셔야 게임을 이용하실 수 있습니다.',
     '이 안내는 게임 설정 > 일반 > 이용 안내에서 다시 확인할 수 있습니다.'
   ];
-  var 안내대상 = 모바일 || !!root.G2앱;
-  try { if (navigator.webdriver) 안내대상 = false; } catch (e) { }
-  function 동의했나() { try { return localStorage.getItem('g2.로그동의') === 안내판; } catch (e) { return false; } }
-  function 동의창() {
-    if (!안내대상 || 동의했나() || typeof document === 'undefined') return;
-    if (!document.body) { document.addEventListener('DOMContentLoaded', 동의창); return; }
-    if (document.getElementById('g2로그동의')) return;
-    var 덮 = document.createElement('div'); 덮.id = 'g2로그동의';
-    덮.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;' +
-      'font:15px/1.55 sans-serif;color:#eee;padding:16px;box-sizing:border-box';
-    var 판 = document.createElement('div');
-    판.style.cssText = 'max-width:640px;width:100%;max-height:100%;display:flex;flex-direction:column;background:#141820;border:1px solid #556;border-radius:8px;padding:14px 20px;box-sizing:border-box';
-    var 본문 = document.createElement('div'); 본문.style.cssText = 'flex:1 1 auto;min-height:0;overflow:auto';   /* 글은 굴리고 단추는 늘 보이게 — 휴대폰 가로 화면 */
-    var 제목 = document.createElement('div'); 제목.textContent = '게임 로그 수집 안내';
-    제목.style.cssText = 'font-weight:bold;font-size:18px;margin-bottom:10px;color:#ffe080';
-    본문.appendChild(제목);
-    이용안내글.forEach(function (줄) {
-      var d = document.createElement('div');
-      if (/^─+$/.test(줄)) { d.style.cssText = 'height:1px;background:#445;margin:8px 0'; }
-      else { d.textContent = 줄; if (!/^[·\s]/.test(줄) && 줄.length < 12) d.style.cssText = 'font-weight:bold;color:#9cf'; }
-      본문.appendChild(d);
-    });
-    판.appendChild(본문);
-    var 단추 = document.createElement('button'); 단추.type = 'button'; 단추.textContent = '동의하고 시작하기 (Enter / ○)';
-    단추.style.cssText = 'flex:0 0 auto;display:block;margin:12px auto 0;padding:12px 28px;font:bold 16px sans-serif;color:#111;background:#ffd040;border:0;border-radius:6px;cursor:pointer';
-    판.appendChild(단추); 덮.appendChild(판); document.body.appendChild(덮);
-    /* 창이 떠 있는 동안 게임이 키·패드를 못 읽게 — 패드는 getGamepads 를 잠시 빈 목록으로 */
-    var 원패드 = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : null, 패드막음 = false;
-    try { if (원패드) { Object.defineProperty(navigator, 'getGamepads', { value: function () { return []; }, configurable: true, writable: true }); 패드막음 = true; } } catch (e) { }
-    var 앞눌림 = true;   /* 창이 뜰 때 이미 누르고 있던 단추는 넘긴다 */
-    function 끝() {
-      try { localStorage.setItem('g2.로그동의', 안내판); } catch (e) { }
-      root.removeEventListener('keydown', 키, true); root.removeEventListener('keyup', 막기, true); clearInterval(패드보기);
-      if (패드막음) try { delete navigator.getGamepads; } catch (e) { }
-      if (덮.parentNode) 덮.parentNode.removeChild(덮);
-      적기('info', ['[이용 안내] 게임 로그 수집 동의 (안내판 ' + 안내판 + ')']);
-    }
-    function 막기(e) { e.stopImmediatePropagation(); }
-    function 키(e) { e.stopImmediatePropagation(); if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); 끝(); } }
-    root.addEventListener('keydown', 키, true); root.addEventListener('keyup', 막기, true);
-    단추.addEventListener('click', 끝);
-    var 패드보기 = setInterval(function () {
-      if (!원패드) return;
-      var 눌 = false; try { var ps = 원패드() || []; for (var i = 0; i < ps.length; i++) { var p = ps[i]; if (p && p.buttons && ((p.buttons[0] && p.buttons[0].pressed) || (p.buttons[1] && p.buttons[1].pressed) || (p.buttons[9] && p.buttons[9].pressed))) 눌 = true; } } catch (e) { }
-      if (눌 && !앞눌림) 끝();
-      앞눌림 = 눌;
-    }, 50);
-  }
-  동의창();
+  /* 동의 창은 배포 첫 화면(앱/설치.html · 모바일/nodejs/설치.html)에 있다 — 처음 한 번 (사장님 11-23 「저 화면은 인게임에서말고 배포 첫화면에서 하면 좋겠어」) */
 
   /* F8 — 어디서든 (게임 키 처리보다 먼저 잡는다) */
   if (root.addEventListener) root.addEventListener('keydown', function (e) {
     if (e.key === 'F8') { e.preventDefault(); e.stopPropagation(); if (창) 닫기(); else 열기(); }
   }, true);
 
-  var API = { 이용안내글: 이용안내글, 동의했나: 동의했나, 동의창: 동의창, 열기: 열기, 닫기: 닫기, 모으기: 모으기, 기록: function () { return 기록.slice(); }, 판: 판, _zip: zip만들기, _바64: 바64, _만들기: function (보내기) { return 만들기(보내기); } };   /* _ 셋은 시험용 */
+  var API = { 이용안내글: 이용안내글, 열기: 열기, 닫기: 닫기, 모으기: 모으기, 기록: function () { return 기록.slice(); }, 판: 판, _zip: zip만들기, _바64: 바64, _만들기: function (보내기) { return 만들기(보내기); } };   /* _ 셋은 시험용 */
   root.G2버그신고 = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);

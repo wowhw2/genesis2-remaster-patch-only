@@ -2462,6 +2462,7 @@ Renderer.prototype.atomicPaletteStep = function () {
 Renderer.prototype.팔레트만갈기 = function (pal, 딱지) {
   var self = this;
   if (!pal || !this.nmap || !root.G2Native) return this;
+  this._팔레트바뀐때 = Date.now();   /* 정본 400 — 범위 바닥 미리 굽기는 팔레트가 잠잠해진 뒤에 */
   if (typeof document !== 'undefined') { try { 창안몰아재기(this); } catch (e창) { 창안판 = null; } }   /* ★ 걸음 머리에 한 번 (2026-10-07) */
   try { return this._팔레트만갈기본(pal, 딱지); }
   finally {
@@ -4198,7 +4199,10 @@ Renderer.prototype._범위리맵미리굽기 = function () {
     쉬는틈(function () {
       self._범위리맵예약 = false;
       if (self._렌더러폐기됨 || self._palSaved || self._섞기필터켬) return;   /* 연출 중 팔레트로는 굽지 않는다 */
-      try { self._범위리맵바닥(); } catch (e) {}
+      /* 팔레트가 아직 바뀌는 중(날씨 서서히 바뀜 — 1.2초에 12걸음)이면 잠잠해질 때까지 미룬다 — 걸음마다 맵 전체를 xBRZ 로 다시 굽느라
+       *   0.5초마다 170~200ms 씩 멈췄다(정본 400 · 11-23 측정 크롬 2-4A 3D 프로파일: 전환 중 CPU 28% 가 _범위리맵바닥) · 굽는 그림도 곧 버려진다 */
+      if (Date.now() - (self._팔레트바뀐때 || 0) < 1000) { self._범위리맵미리굽기(); return; }
+      try { self._범위리맵바닥(true); } catch (e) {}   /* 미리 굽기 — PNG 변환을 비동기로(정본 400) */
     });
   }, 300);
 };
@@ -4294,44 +4298,76 @@ Renderer.prototype._범위미리 = function () {
   this._범위미리타이머 = setTimeout(function () {
     self._범위미리타이머 = null;
     try {
-      var url = self._범위리맵URL || self._범위리맵바닥();
-      if (url && typeof Image === 'function' && !(self._범위리맵그림 && self._범위리맵그림._url === url)) {
-        var im = new Image(); im._url = url; im.src = url;
-        if (im.decode) im.decode()['catch'](function () { });
-        self._범위리맵그림 = im;   /* 리마스터3D 표식3D 가 같은 주소면 이 그림을 그대로 쓴다 */
-      }
+      /* 정본 400 — 미리 만들기는 비동기(GPU 칠 + toBlob) · 다 되면 그림을 데운다 */
+      Promise.resolve(self._범위리맵URL || self._범위리맵바닥(true)).then(function (url) {
+        if (url && typeof Image === 'function' && !(self._범위리맵그림 && self._범위리맵그림._url === url)) {
+          var im = new Image(); im._url = url; im.src = url;
+          if (im.decode) im.decode()['catch'](function () { });
+          self._범위리맵그림 = im;   /* 리마스터3D 표식3D 가 같은 주소면 이 그림을 그대로 쓴다 */
+        }
+      }, function () { });
     } catch (e) { }
     /* 범위를 칠할 때 함께 부르는 덮인칸 → 가시 리맵판(맵 전체 그림 · 처음 한 번 337ms 실측)도 — 한꺼번에 하면 그 순간이 멈추니 짬을 두고 */
     setTimeout(function () { try { if (self.덮인칸) self.덮인칸(0, 0); } catch (e2) { } }, 400);
   }, 1500);
 };
-Renderer.prototype._범위리맵바닥 = function () {
+Renderer.prototype._범위리맵바닥 = function (비동기) {
   var pal = this._유닛팔레트();
   if (!pal || !this._floorIdx || !root.G2Remap || !root.G2Remap['표1'] || !root.G2Native) return null;
   var 보강 = !!(root.G2Remap.표식보강켬 && root.G2Remap.표식보강켬()) && this._눈밭맵(pal);   /* [리마스터 밝은바닥표식] 눈밭 맵에서만 (정본 316) */
   if (this._범위리맵URL && this._범위리맵팔 === pal && this._범위리맵보강 === 보강) return this._범위리맵URL;
+  if (비동기 && this._범위리맵굽는중 && this._범위리맵굽는중.pal === pal) return this._범위리맵굽는중.p;
+  var self = this;
   try {
     var palH = root.G2Remap['표1그릴색'](pal, 보강, 보강);   /* 목표 1 · 강도 30 · 보정 9 — 눈밭 맵 보강이면 눈 색만 하늘색 */
     palH._기록바탕 = pal._기록바탕 || pal; /* 계측 전용 꼬리표 — 이 팔레트를 만든 원래 팔레트(암전 판정 · 04_도구/우리그리기기록.js · 2026-09-27) */
-    this._범위리맵URL = root.G2Native.frameToCanvas(this._floorIdx, palH).toDataURL();
-    this._범위리맵팔 = pal; this._범위리맵보강 = 보강;
-    /* ☠★★★★★ **주소를 요소마다 쓰면 안 된다** (2026-09-10)
-     *   이 data-URL 은 **500KB 안팎**이다. 범위 표시는 `clearMarks() → addMark × 61` 을
-     *   **매 프레임** 돌므로, `cssText` 에 넣으면 프레임마다 **30MB** 짜리 문자열을
-     *   만든다. ⇒ **스타일 규칙 한 줄**에 넣고 요소는 클래스만 단다. */
-    if (typeof document !== 'undefined') {
-      var st = document.getElementById('g2-범위리맵-스타일');
-      if (!st) { st = document.createElement('style'); st.id = 'g2-범위리맵-스타일';
-                 (document.head || document.documentElement).appendChild(st); }
-      st.textContent = '.g2-mark.g2-범위리맵{' +
-        bgcss(this._범위리맵URL, this._floorW, this._floorH) +
-        'image-rendering:' + rend() + ';}';
+    /* ★ 정본 400 — 스케일러면 바닥이 이미 그래픽 카드에 올린 확대판(_바닥확대칠하기 와 같은 판)을 새 색으로 칠만 다시 한다
+     *   frameToCanvas 는 맵 전체를 xBRZ 로 CPU 에서 다시 확대해 PC 에서도 200ms 남짓 멈췄다(11-23 측정 크롬 2-4A 3D · 날씨 바뀐 뒤 · 프로파일 CPU 28%) */
+    var cv = null, S = root.G2Scaler;
+    if (S && S.N() > 1 && this._바닥바탕 && root.G2PaletteGPU) {
+      var 판 = 확대판얻기(this, '바닥', this._floorIdx, this._palSaved || this._음영바탕 || pal, this._바닥바탕);
+      if (판 && 판.gpu) cv = 확대판칠하기(판, palH);
     }
-    return this._범위리맵URL;
+    if (!cv) cv = root.G2Native.frameToCanvas(this._floorIdx, palH);
+    /* 미리 만들기는 PNG 변환도 비동기(toBlob → blob 주소) — 다 됐을 때 팔레트가 또 바뀌었으면 버린다 */
+    if (비동기 && cv.toBlob && typeof URL !== 'undefined' && URL.createObjectURL) {
+      var 굽 = { pal: pal };
+      굽.p = new Promise(function (ok) {
+        cv.toBlob(function (b) {
+          if (self._범위리맵굽는중 === 굽) self._범위리맵굽는중 = null;
+          if (!b || self._렌더러폐기됨 || self._유닛팔레트() !== pal) { ok(null); return; }
+          if (self._범위리맵URL && self._범위리맵팔 === pal && self._범위리맵보강 === 보강) { ok(self._범위리맵URL); return; }   /* 그새 바로 만들었다 */
+          try { ok(self._범위리맵주소걸기(URL.createObjectURL(b), pal, 보강)); } catch (e2) { ok(null); }
+        }, 'image/png');
+      });
+      this._범위리맵굽는중 = 굽;
+      return 굽.p;
+    }
+    return this._범위리맵주소걸기(cv.toDataURL(), pal, 보강);
   } catch (e) {
     console.warn('[범위리맵] 실패 — 반투명으로 떨어진다:', e && e.message);
     return null;
   }
+};
+/** 범위 바닥 그림 주소를 건다 — 스타일 규칙 한 줄 (옛 blob 주소는 놓아준다) */
+Renderer.prototype._범위리맵주소걸기 = function (url, pal, 보강) {
+  var 옛 = this._범위리맵URL;
+  this._범위리맵URL = url;
+  this._범위리맵팔 = pal; this._범위리맵보강 = 보강;
+  /* ☠★★★★★ **주소를 요소마다 쓰면 안 된다** (2026-09-10)
+   *   이 data-URL 은 **500KB 안팎**이다. 범위 표시는 `clearMarks() → addMark × 61` 을
+   *   **매 프레임** 돌므로, `cssText` 에 넣으면 프레임마다 **30MB** 짜리 문자열을
+   *   만든다. ⇒ **스타일 규칙 한 줄**에 넣고 요소는 클래스만 단다. */
+  if (typeof document !== 'undefined') {
+    var st = document.getElementById('g2-범위리맵-스타일');
+    if (!st) { st = document.createElement('style'); st.id = 'g2-범위리맵-스타일';
+               (document.head || document.documentElement).appendChild(st); }
+    st.textContent = '.g2-mark.g2-범위리맵{' +
+      bgcss(this._범위리맵URL, this._floorW, this._floorH) +
+      'image-rendering:' + rend() + ';}';
+  }
+  if (옛 && 옛 !== url && 옛.slice(0, 5) === 'blob:' && typeof URL !== 'undefined' && URL.revokeObjectURL) { try { URL.revokeObjectURL(옛); } catch (e) { } }
+  return url;
 };
 /**
  * ★ **탐색 스킬이 찾은 칸의 음영** — 원본 `0x18E77`~`0x18EAB` (2026-09-24)
