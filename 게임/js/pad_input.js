@@ -169,6 +169,7 @@ function 누를자리(lx, ly, 단계) {   /* 단계 'down'·'up'·'click' — �
   if (단계 !== 'up') 마우스('mousedown', 0); if (단계 !== 'down') 마우스('mouseup', 0);
   마 = 옛; if (옛) 마우스('mousemove', 0);
 }
+var 전투네모값 = false;   /* 정본 397 */
 var 캐커 = { 화면: null }, 들고있음 = false, 집기대기 = 0, 네모로연것 = null, 네모대기 = 0;   /* 캐릭터 창 패드 커서 — 창이 바뀌면 새로 · 창고 자리·스크롤은 그 창을 닫을 때까지 기억 */
 function 캐ui(장) { try { return 장.출처 === '전투' ? root.G2Screens.배치창셸().ui() : root.__셸.ui(); } catch (e) { return null; } }
 function 캐릭터창패드(st, 장) {
@@ -833,7 +834,9 @@ function 틱(지금) {
   if (지장.이름 === '전투' && root.G2전투패드 && !배창중) {
     if (st.새로.L2) { 마쓰는중 = false; root.G2전투패드.아군(-1); }
     if (st.새로.R2) { 마쓰는중 = false; root.G2전투패드.아군(1); }
-    if (st.새로.네모) root.G2전투패드.상태창();
+    if (st.새로.네모) 전투네모값 = !root.G2전투패드.상태창();   /* 커서 칸에 캐릭터가 없어 상태창이 안 열리면 누르는 동안 HP 전부 (정본 397) */
+    if (!st.눌림.네모) 전투네모값 = false;
+    if (root.G2전투패드.값보기) root.G2전투패드.값보기(전투네모값);
   }
   /* 마을 네모 = 게임 화면 캔버스(#화면) «한가운데»에 «캔버스로 바로» 우클릭 — 게임은 마우스를 #화면 에서만 받는데(게임.html 마우스대상)
    *   패드는 가상 마우스 자리의 맨 위 요소에 쏜다. 상태창 안에서 패드가 옮긴 자리(EXIT 등)가 남아 그 자리 위 다른 요소에 맞으면 우클릭이 안 닿아
@@ -872,7 +875,8 @@ function 틱(지금) {
   하이그리기();
 }
 root.requestAnimationFrame(틱);
-document.addEventListener('mousemove', function (e) { if (e.isTrusted && root.__패드커서숨김) { root.__패드커서숨김 = false; if (root.G2전투패드 && root.G2전투패드.커서다시) root.G2전투패드.커서다시(); } }, true);   /* 전투 옵션창은 마우스 움직임을 먼저 가로채 전투 커서가 다시 안 그려졌다 — 여기서 바로 (사장님 11-07 「내가 문제된건 전투 옵션창이었어」) */   /* 진짜 마우스를 움직여도 커서가 다시 */
+var 진짜마우스자리 = null;   /* 정본 394 — 크롬이 화면 변화로 보내는 같은 좌표의 mousemove 는 «마우스를 움직였다»가 아니다 */
+document.addEventListener('mousemove', function (e) { if (!e.isTrusted) return; var 같다 = 진짜마우스자리 && 진짜마우스자리.x === e.clientX && 진짜마우스자리.y === e.clientY; 진짜마우스자리 = { x: e.clientX, y: e.clientY }; if (같다) return; if (root.__패드커서숨김) { root.__패드커서숨김 = false; if (root.G2전투패드 && root.G2전투패드.커서다시) root.G2전투패드.커서다시(); } }, true);   /* 전투 옵션창은 마우스 움직임을 먼저 가로채 전투 커서가 다시 안 그려졌다 — 여기서 바로 (사장님 11-07 「내가 문제된건 전투 옵션창이었어」) */   /* 진짜 마우스를 움직여도 커서가 다시 */
 
 /* [리마스터] 마우스 가운데 단추(휠 누르기) → 마을·전투 시점 기본값으로 — 패드 R3 와 같다 (사장님 11-11 「전투 마을 모두 마우스 휠을 누르면 카메라 원위치되면 좋겠어(패드의 r3 버튼처럼)」) */
 document.addEventListener('mousedown', function (e) {

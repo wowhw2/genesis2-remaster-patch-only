@@ -4322,7 +4322,8 @@
    *   (`native.js decodeSound` · `0x5C665 eax = 0x55F0`).
    *   그림이 `F_BALL2.NSP`(화염 1계열 2클래스)이므로 소리도 같은 계열로 골랐다. */
   var MAGE_BOLT = { 키: '마법투사체', 파일: 'MAGICSPR/F_BALL2.NSP', 프레임: 0,
-                    소리키: '마법평타', 소리파일: 'MAGICSPR/F-BALL.SSP' };
+                    소리키: '마법평타', 소리파일: 'MAGICSPR/F-BALL.SSP',
+                    배율: 0.5 };   /* 정본 399 — 그림 크기 (17×15 → 9×8) */
   var _mageBoltReady = null;
   function 마법투사체준비() {
     if (_mageBoltReady) return _mageBoltReady;
@@ -4428,6 +4429,12 @@
       var def = G2Fx.meta(마법 ? MAGE_BOLT.키 : '투사체');
       var rect = def && def['프레임'] && def['프레임'][프레임];
       if (!def || !def.url || !rect) return;
+      /* [리마스터] 정본 399 — 마법사 원거리 평타 탄(F_BALL2 0번 17×15)은 절반 크기로 — 캐릭터만 해서 파이어볼보다 세 보였다
+       *   (사장님 11-22 「리마스터사양인 마법사 평타 원거리의 경우 이펙트가 커서 너무 강해보인다고 해.(파이어볼보다 세보인다고 함) … 사이즈를 훨씬 작게」)
+       *   잘라 보이는 칸·시트 배경·가운데 기준(ax·ay)을 같은 배율로 줄여 날아가는 길과 가운데는 그대로 · 착탄 폭발은 원래 크기 */
+      var 탄배 = 마법 ? MAGE_BOLT.배율 : 1;
+      if (탄배 !== 1) rect = { x: rect.x * 탄배, y: rect.y * 탄배, w: Math.max(1, Math.round(rect.w * 탄배)), h: Math.max(1, Math.round(rect.h * 탄배)),
+                              ax: Math.round((rect.ax | 0) * 탄배), ay: Math.round((rect.ay | 0) * 탄배) };
 
       /* 0x46E56 · 0x46E72 — 시작 = 시전자 칸 + (12, −2). 목표도 같은 기준. */
       var s = R.mapOf(a), t = R.mapOf(tgt);
@@ -4494,6 +4501,7 @@
        *   ✅ **만들었다** — 아래 `착탄()` 이 흔들기 `−(6−i)/2` 와 여섯 장을 그린다. */
       /* 0x4724F~0x47284: 기존 화면 조각 저장 → 블릿 → 전송 → 복원. 화면 위 도막이다. */
       var e = R.fxSprite(def.url, 'top'), TICK2 = G2Anim.TICK_MS;
+      if (탄배 !== 1 && def['시트']) e.style.backgroundSize = (def['시트'][0] * 탄배) + 'px ' + (def['시트'][1] * 탄배) + 'px';   /* 정본 399 — 시트도 같은 배율 */
       /* 시트에서 그 프레임만 잘라 보인다 — rect 는 `{x, y, w, h, ax, ay}` */
       R.연출시트프레임반영(e, rect);
       /* ★ 난사는 루프 앞에서 `0x2F199 eax=2 → 0x2F19E call 0x1033B` 로 **2틱**을 건다 */
@@ -9875,12 +9883,14 @@
       /* ★ 맞출 칸 = 원본 0x4D582 — 그림 가운데 픽셀(칸 + 12 + ax + w/2 · 칸 − 2 + ay + h/2)이 속한 칸(0x109A3·0x109CE) ·
        *   무기 종류(0x174CF) 5·0xB 면 바라보는 쪽으로 3 칸 앞(0x4D604~0x4D631: 방향 0 y+3 · 1 x−3 · 2 y−3 · 3 x+3) → 0x1124A(칸) = 칸 − 6 에 카메라
        *   ☠ 예전 goUnit 은 그림 가운데로 «픽셀 단위» 부드럽게 옮겨 원본 칸 카메라와 달랐다(비연참 끝 영점 원본 −236 ↔ 우리 −197.5) */
+      링유닛 = unit; 링정지 = null;   /* 정본 394 — 떠 있는 동안 매 프레임 이 유닛 화면 자리로 링을 붙인다 */
       var 링칸 = 링카메라칸(unit), 칸x = 링칸.x, 칸y = 링칸.y;   /* 정본 373 — 패드 L2·R2 초점 이동도 같은 칸을 겨냥한다(링이 뜨기 직전 카메라가 한 번 더 움직이지 않게) */
       var 링카메라 = Promise.resolve(R.focusScroll ? R.focusScroll(칸x, 칸y) : (R.goUnit ? R.goUnit(unit) : R.goTile(unit.x, unit.y)));
       if (typeof window.G2연출싣기 === 'function') window.G2연출싣기(링카메라);
       링카메라.then(function () {
         연출카메라표시고정();   /* 원본은 옮긴 뒤 곧바로 그 자리로 그린다 — 표시 보간이 게임 시간을 따라 늦게 오지 않게 (2026-09-27 · 영점 −197.5 ↔ −236) */
-        ringCamWait = false;
+        /* ★ 정본 394 — 곧바로 보이지 않는다: 화면(표시 보간·3D 시선)이 실제로 멈출 때까지(링 자리가 두 프레임 그대로) 아래 렌더 루프 링따라가기가 기다렸다 연다 */
+        ringCamWait = '정지'; 링정지 = { 앞: null, 같음: 0, 시작: performance.now() };
         /* ★★★ **카메라가 선 뒤 링 중심을 다시 잰다** (2026-08-25)
          *   open() 시점은 카메라가 **아직 가는 중**이라 그때 잰 좌표는 옛 자리다.
          *   맵 가장자리처럼 유닛이 화면 한가운데로 못 오는 자리에서 특히 어긋난다. */
@@ -9976,6 +9986,7 @@
       G2Ring.메뉴교체(menu, icons);           /* 0x4B9D7 모으기 → 0x4B8EB 펼치기 */
     },
     close: function () {
+      링유닛 = null; 링정지 = null;
       if (G2Ring.isOpen()) G2Ring.close();               /* 0x4B842 */
       R.showUnitValues(false);
     },
@@ -9988,8 +9999,32 @@
     hide: function () { ringHidden = true; }
   };
   var ringHidden = false;
-  /* 부드러운 스크롤로 유닛을 향해 가는 동안엔 링 그림을 참습니다 (위 open 참고) */
+  /* 부드러운 스크롤로 유닛을 향해 가는 동안엔 링 그림을 참습니다 (위 open 참고) · '정지' = 카메라 약속은 끝났고 화면이 멈추길 기다림(정본 394) */
   var ringCamWait = false;
+  /* ★★ 정본 394 — L2·R2 로 캐릭터를 바꾸고 링을 열면 카메라가 못 따라가 링이 캐릭터에서 어긋났다 (예전부터 · 여러 번 고쳤으나 남음)
+   *   (사장님 11-22 「l2 r2로 캐릭터 전환시 링커맨드 뜰때 카메라가 못따라가서 어긋나는 문제 자주 발생해 … 근본적인 원인 찾아서 반드시 제대로 해결해야해」·
+   *    「캐릭터간 거리가 멀면 더 잘 발생한다고」·「카메라 도착 전에 링이 열린다고!」)
+   *   근본: 링 가운데를 «열 때 한 번 · 카메라 약속이 끝날 때 한 번»만 재고 고정했다 — 그 뒤에도 화면이 움직이면(느린 기기의 표시 보간 · 3D 시선 · 패드 카메라 미끄럼) 링만 제자리에 남았다.
+   *   ⇒ ① 링 자리는 링자리재기() 하나로 ② 떠 있는 동안 매 프레임 그 유닛의 지금 화면 자리에 붙인다 ③ 약속이 끝나도 화면이 실제로 멈출 때(두 프레임 그대로)까지 감췄다가 연다 · 0.6초 안전장치 */
+  var 링유닛 = null, 링정지 = null;
+  function 링자리재기(unit) {
+    if (!unit || !R.screenOfRendered) return null;
+    var 오 = { dx: 0, dy: 0 };
+    try { if (R.spriteCenterOffset) 오 = R.spriteCenterOffset(unit) || 오; } catch (e) {}
+    var p = R.screenOfRendered(unit, 12 + (오.dx | 0), -2 + (오.dy | 0));   /* 0x12F2A 기준점 + 그림 가운데 */
+    return (p && isFinite(p.x) && isFinite(p.y)) ? { x: Math.round(p.x), y: Math.round(p.y) } : null;
+  }
+  function 링따라가기() {
+    if (!링유닛 || !G2Ring.isOpen()) return;
+    var c = 링자리재기(링유닛); if (!c) return;
+    var 지금 = G2Ring.패드자리 ? G2Ring.패드자리().중심 : null;
+    if (!지금 || 지금.x !== c.x || 지금.y !== c.y) G2Ring.중심설정(c.x, c.y);
+    if (ringCamWait === '정지' && 링정지) {
+      var 같 = 링정지.앞 && 링정지.앞.x === c.x && 링정지.앞.y === c.y;
+      링정지.같음 = 같 ? 링정지.같음 + 1 : 0; 링정지.앞 = c;
+      if (링정지.같음 >= 2 || performance.now() - 링정지.시작 > 600) { ringCamWait = false; 링정지 = null; refresh(); }
+    }
+  }
   /* 링을 열 때 카메라를 맞출 칸 — 원본 0x4D582: 그림 가운데 픽셀(칸 + 12 + ax + w/2 · 칸 − 2 + ay + h/2)이 속한 칸(0x109A3·0x109CE) ·
    *   무기 종류(0x174CF) 5·0xB 면 바라보는 쪽으로 3 칸 앞(0x4D604~0x4D631: 방향 0 y+3 · 1 x−3 · 2 y−3 · 3 x+3) → 0x1124A(칸) = 칸 − 6 에 카메라
    *   (ringView.open 에 있던 계산을 그대로 뺐다 — 정본 373: 패드 L2·R2 초점 이동도 이 칸을 겨냥해 링이 뜰 때 카메라가 다시 안 움직이게) */
@@ -12744,7 +12779,13 @@
     var _링열림 = 체력표시깃발();                          /* 0x4BA5C 접기 → 0 */
     if (풍아표적고르기) R.showUnitValues(true, null, { force: true, targetPick: true });
     else if (_링열림) R.showUnitValues(true, null);          /* 0x13546 — 화면 안 전부 */
-    else R.showUnitValues(!!hoverUnit, hoverUnit || null);   /* [리마스터] 올린 한 명만 */
+    else if (네모값보기 && ctrl.모드인가(G2Controller.MODE.FRAME_IDLE)) R.showUnitValues(true, null);   /* 정본 397 — 아무도 안 고르고 □ 누르는 동안 화면 안 전부(암전 없이) */
+    else {
+      /* 정본 396 — 대상 고르기 중 커서 상자가 올라간 적·아군 한 명은 HP 도 (전체는 그대로 감춤 · 광역 효과 범위 확인 단계는 감춤 — 2026-08-16 「타겟 지정이나 효과 범위 보여줄 때 hp 표시하지 않아」)
+       *   (사장님 11-22 「이 떄, 포커싱된 적 또는 아군 캐릭터에 커서박스 표시 생겼을 때 HP도 함께 표시되면 좋겠어.」) */
+      var _대상한명 = !!hoverUnit && ctrl.모드인가(G2Controller.MODE.TARGET_SELECT) && !(ctrl.효과범위확인중인가 && ctrl.효과범위확인중인가());
+      R.showUnitValues(!!hoverUnit, hoverUnit || null, _대상한명 ? { targetPick: true } : undefined);   /* [리마스터] 올린 한 명만 */
+    }
     R.facingGuide(facing);
     drawReadyMarks();
     R.apply();
@@ -14545,6 +14586,13 @@
      *   우리는 hover 를 그대로 넘겨 카메라가 따라 움직였다. */
     if (이벤트활성중()) { mouse.inside = false; return; }
     if (onWidget(e)) { mouse.inside = false; return; }
+    /* ★★ 정본 394 — 크롬은 화면 내용이 움직이면(카메라·DOM) 마우스를 안 움직여도 같은 좌표로 «진짜» mousemove 를 보낸다
+     *   → 패드로 L2·R2 를 누르는 사이 «마우스를 다시 쓴다»가 되어, 포인터가 창 가장자리에 놓여 있으면 가장자리 스크롤이 카메라를 맵 끝으로 밀고
+     *     커서 상자도 포인터 밑 칸으로 갔다 (사장님 11-22 사진 셋 · 「누르다보면 카메라가 캐릭터가 아닌 이상한 곳으로 포커싱돼. 링커맨드 문제가 아니라」·
+     *     「캐릭터가 없는 특정한 위치로 계속 들어가네」 · 측정 창(마우스 없음)에선 안 남)
+     *   ⇒ 패드·손가락 조작 중(__패드커서숨김)에는 좌표가 실제로 바뀐 진짜 마우스 움직임만 «마우스 씀»으로 친다 */
+    if (e.isTrusted && window.__패드커서숨김 && mouse.진짜x === e.clientX && mouse.진짜y === e.clientY) return;
+    if (e.isTrusted) { mouse.진짜x = e.clientX; mouse.진짜y = e.clientY; }
     mouse.cx = e.clientX; mouse.cy = e.clientY; mouse.inside = true; if (e.isTrusted) 패드칸표시 = false;   /* 마우스를 움직이면 패드 칸 상자는 원작대로 */
     var p = G2Hud.toLogical(e.clientX, e.clientY);
     mouse.lx = p.x; mouse.ly = p.y;
@@ -14612,6 +14660,19 @@
     ctrl.input({ type: 'click', lx: lg.x, ly: lg.y });        // press 없음 = 놓기
   });
   stage.addEventListener('contextmenu', function (e) { if (!onWidget(e)) e.preventDefault(); });
+  /* ★ 정본 393 — 휴대폰 가상 패드로 방향을 고르는 중 손가락(엄지 뿌리 등)이 패드 옆 게임 화면에 스치면
+   *   터치가 «그 자리로 커서 → 클릭»이 되어 화살표가 손 쪽(아래)으로 튀고 방향 고르기가 확정·해제됐다 — 방향 고르기 중 클릭은 원작대로 어디를 눌러도 확정이라서
+   *   (사장님 11-22 「간혹 방향을 바꾸다 보면 동그라미를 안눌렀는데도 선택이 되는 문제가 있고 이렇게 선택 될때 화살표 위치가 아래쪽으로 튀는 문제가 있어. 주로 왼쪽 화살표에서 그러고 모바일에서(안드로이드)」
+   *    · 측정 창 진짜 터치 재현: 패드 옆 (230,760) 톡 → 화살표 536→590 · FACING_SELECT → MOVE_DESTINATION_SELECT)
+   *   ⇒ 가상 패드를 켜고(실제 패드 아님) 방향 고르기 중이면 손가락에서 온 마우스는 삼킨다 — 확정 ○ · 취소 ✕ · 가상 패드를 끈 손가락 조작은 그대로 */
+  ['mousemove', 'mousedown', 'mouseup', 'click', 'contextmenu'].forEach(function (종류) {
+    window.addEventListener(종류, function (e) {
+      if (!window.__터치마우스) return;
+      var T = window.G2터치; if (!T || !T.가상패드 || !T.가상패드() || (T.실패드 && T.실패드())) return;
+      if (!(ctrl && ctrl.facingDraft && ctrl.facingDraft())) return;
+      e.stopImmediatePropagation(); if (e.cancelable) e.preventDefault();
+    }, true);
+  });
 
   /* ══════════════════════ [리마스터] 게임패드 창구 (pad_input.js · 설계서 6절 ①④⑦⑨) ══════════
    *   원작은 마우스로만 칸을 고른다 — 패드 십자는 «커서 칸»을 한 칸씩 옮기고(hover 와 같은 길), 동그라미는 그 칸을 누른다(mousedown 과 같은 길).
@@ -14642,6 +14703,7 @@
    *   (사장님 11-07 「월드나, 전투에서 이동시 카메라가 부드럽게 따라갔으면 좋겠어. 지금은 너무 뚝뚝 끊어져. 칸은 분절적으로 선택되어도 부드럽게 연결이 되어야할 것 같아.」)
    *   목표는 «지금 가는 중인 목표»에서 이어 잰다(연속 이동이 쌓이게) · 마우스 가장자리 스크롤이 돌면 멈춘다 */
   var 패드캠목 = null;
+  var 네모값보기 = false;   /* 정본 397 — 패드 □ 를 누르고 있는 동안(빈 칸) 아군·적 HP 전부 */
   var 패드고른 = null;   /* 정본 373 — 패드(L2·R2·십자)로 고른 대기 아군 · ✕ 로 고름 취소 · 턴 순서 초상화가 강조한다 */
   function 패드캠목표로(옮기기) {
     var 옛 = { cx: R.cam.cx, cy: R.cam.cy };
@@ -14681,9 +14743,33 @@
   /* [리마스터 패드] L2/R2 차례 = 화면에서 보이는 왼쪽 → 오른쪽(같은 열이면 위 → 아래) — L2 = 왼쪽 · R2 = 오른쪽
    *   (2026-11-08 사장님 「이전타겟 다음타겟은 논리적인거고 실제 조작은 화면에 보이는 방향으로 맞춰야해. 상식적으로 r2를 눌렀을대 오른쪽 방향으로 이동하고, l2를 눌렀을때 왼쪽으로 이동하는게 맞지 않겠어?」)
    *   사거리 훑기(0x1AC08)·우클릭 차례(0x55AC7)는 칸 차례라 기울기·회전에 따라 화면에서 거꾸로 움직였다 · 화면 자리 = 칸화면자리(지금 카메라·3D 시선 그대로) */
+  var 화면방향 = null;   /* 정본 394 — 화면왼쪽부터 순서용 화면 방향(회전·기울기가 바뀔 때만 다시 잼) */
+  function 원거리단일첫대상(a) {
+    var rc = ctrl.rangeContext, sc = ctrl.selector && ctrl.selector.ctx;
+    if (!rc || !rc.cells || rc.효과확인 || rc.대포십자 || !sc || sc.pickAny || sc.allowEmpty || sc.relation === 'empty') return null;
+    var 원거리 = rc.cells.some(function (c) { return c && Math.abs((c.x | 0) - (a.x | 0)) + Math.abs((c.y | 0) - (a.y | 0)) > 1; });
+    if (!원거리) return null;
+    var 대상 = 화면왼쪽부터(rc.cells.filter(function (c) { return c && c.legal && c.unit; }));
+    return 대상.length ? { x: 대상[0].x | 0, y: 대상[0].y | 0 } : null;
+  }
   function 화면왼쪽부터(목록) {
-    var 자 = 목록.map(function (o, i) { var s = 칸화면자리(o.x | 0, o.y | 0); return { o: o, i: i, x: s ? s.x : (o.x | 0) * 24, y: s ? s.y : (o.y | 0) * 16 }; });
-    자.sort(function (a, b) { return (Math.abs(a.x - b.x) > 4 ? a.x - b.x : a.y - b.y) || (a.i - b.i); });
+    /* ★★ 정본 394 — 순서를 «지금 카메라로 본 화면 자리»로 정하면 카메라가 움직일 때마다 순서가 바뀌고, 화면 밖 캐릭터는 자리를 못 재 맵 좌표가 섞여
+     *   L2·R2 가 건너뛰거나 되돌아갔다 (2-4A 측정: 라시드 → 뮐러 → 라시드 → 미카엘 · 사장님 「턴 순서가 바뀌면서 건너뛰어지는 캐릭터들이 있어」)
+     *   ⇒ 화면 «방향»(회전·기울기)만 화면 가운데 칸에서 재고, 순서는 맵 좌표를 그 방향으로 투영한 값 — 카메라가 어디 있든 같은 순서 */
+    /* 덧(같은 날) — 방향을 매 프레임 재면 3D 원근 때문에 카메라가 움직이는 동안 값이 흔들려 거의 같은 줄의 캐릭터 순서가 잠깐 뒤집혔다
+     *   (사장님 「아직도 l2 r2 누르다보면 중간에 캐릭터 순서 잠깐 바뀌어. 다시 돌아오기는 하는데 바뀌는거 거슬려」)
+     *   ⇒ 회전·기울기가 바뀔 때만 다시 재고 그 사이엔 고정 · 방향은 정규화하고 «같은 열» 판정은 칸 단위(0.5 칸) */
+    var 열쇠 = Math.round((R.cam && R.cam.rot) || 0) + ',' + Math.round((R.cam && R.cam.tilt) || 0);
+    if (!화면방향 || 화면방향.열쇠 !== 열쇠) {
+      var 가 = { x: Math.round((R.cam && R.cam.cx || 0) / 24), y: Math.round((R.cam && R.cam.cy || 0) / 16) };
+      var a = 칸화면자리(가.x, 가.y), b = 칸화면자리(가.x + 1, 가.y), d = 칸화면자리(가.x, 가.y + 1);
+      var 정 = function (v) { var l = Math.hypot(v.x, v.y) || 1; return { x: v.x / l, y: v.y / l }; };
+      if (a && b && d) 화면방향 = { 열쇠: 열쇠, 동: 정({ x: b.x - a.x, y: b.y - a.y }), 남: 정({ x: d.x - a.x, y: d.y - a.y }) };
+      else 화면방향 = { 열쇠: '', 동: { x: 1, y: 0 }, 남: { x: 0, y: 1 } };   /* 못 재면 다음에 다시 */
+    }
+    var 동 = 화면방향.동, 남 = 화면방향.남;
+    var 자 = 목록.map(function (o, i) { var cx = o.x | 0, cy = o.y | 0; return { o: o, i: i, x: cx * 동.x + cy * 남.x, y: cx * 동.y + cy * 남.y }; });
+    자.sort(function (a, b) { return (Math.abs(a.x - b.x) > 0.5 ? a.x - b.x : a.y - b.y) || (a.i - b.i); });   /* 0.5 칸 — 위 투영이 칸 단위 */
     return 자.map(function (k) { return k.o; });
   }
   ['settle', '_대기초점'].forEach(function (k) { var 옛 = ctrl[k]; if (typeof 옛 === 'function') ctrl[k] = function () { 패드차례++; return 옛.apply(this, arguments); }; });
@@ -14788,6 +14874,10 @@
       var 고르기 = this.모드살피기();
       if (패드차례본 === 패드차례) return null; 패드차례본 = 패드차례;
       var 세 = ctrl.명령세션상태 && ctrl.명령세션상태(), a = (고르기 && 세 && 세.행위자) || ctrl.actor;
+      /* 정본 395 — 원거리 단일 대상(활·단일 마법 등) 고르기에 막 들어오면 범위 안 첫 대상(L2·R2 차례 = 화면 왼쪽부터)으로 커서만 — 고르지는 않는다
+       *   (사장님 11-22 「원거리 단일 타겟(활, 단일 타겟 마법 등)의 경우 타겟지정시 영역내 1번 타겟으로 자동으로 이동하면 좋겠어. 타겟 선정은 되면 안되고 커서만 이동.」)
+       *   단일 = 고르기가 아무 칸(pickAny)·빈 칸(allowEmpty)이 아니다 · 원거리 = 행위자에서 2 칸 넘게 떨어진 칸이 범위에 있다 · 대포 십자 고르기는 칸 우선이라 뺀다 */
+      if (고르기 && a && ctrl.모드인가('TARGET_SELECT')) { try { var 첫 = 원거리단일첫대상(a); if (첫) return 첫; } catch (e첫) { } }
       return (a && a.alive !== false) ? { x: a.x | 0, y: a.y | 0 } : null;
     },
     /** 매 프레임(패드 모드) — 차례가 바뀌었거나 칸 고르기에 막 들어왔으면 그 프레임에 커서를 캐릭터 칸으로 · 카메라는 차례 초점이 옮기므로 건드리지 않는다
@@ -14797,16 +14887,22 @@
       if (!패드칸가능() || 패드차례본 === 패드차례) return false;
       var 시 = this.시작칸(); if (!시) return false;
       var t = clampTile(시.x, 시.y); mouse.inside = false; 패드칸표시 = true;
+      /* 정본 395 — 원거리 첫 대상으로 옮긴 때(캐릭터 칸이 아님)는 화면 안에 보이게 카메라를 민다(끝 2칸 규칙 — 십자 이동과 같다) */
+      var 행0 = ctrl.actor; if (행0 && (t.x !== (행0.x | 0) || t.y !== (행0.y | 0))) 패드칸보이기(t.x, t.y);
       var h = ctrl.input({ type: 'hover', x: t.x, y: t.y });
       if (h) h.then(function () { refresh(); applyCursorImage(); });
       return true;
     },
     /** 커서 칸으로 옮긴다 — 마우스 hover 와 같은 입력 · 진짜·가상 마우스 자리는 버린다(가장자리 스크롤이 옛 자리로 밀지 않게) */
-    커서옮기기: function (tx, ty) {
+    커서옮기기: function (tx, ty, 카메라그대로) {
       if (!패드칸가능()) return false;
       var t = clampTile(tx, ty); mouse.inside = false; 패드칸표시 = true;
       패드고른 = (ctrl.모드인가('FRAME_IDLE') ? ctrl.readyUnits().filter(function (v) { return v.x === t.x && v.y === t.y; })[0] : null) || null;   /* 정본 373 — 커서가 대기 아군 칸이면 그 캐릭터를 고른 것으로 */
-      패드칸보이기(t.x, t.y);
+      /* ★★ 정본 394 — L2·R2 는 카메라를 이미 그 캐릭터 가운데로 잡았다(패드캠목표로 · R.center) → 여기서 «끝 2칸 밀기»를 또 하면
+       *   그 판정이 «아직 옛 자리에 그려진 화면»으로 새 캐릭터 자리를 재서(표시 보간) 화면 밖이라 보고 카메라를 최대 8 칸 밀었다
+       *   (2-4A 측정: 라시드 → 미카엘 15,28 · 목표 cam 360 → 360 − 8×24 = 168 · 미카엘이 화면 오른쪽 끝 · 사장님 「2-4a 에서 … 거의 100퍼센트 가깝게 이상한 곳으로 튀어」 ·
+       *    캐릭터 사이가 멀수록 잘 난 까닭) ⇒ 부른 쪽이 카메라를 맞췄으면(카메라그대로) 밀지 않는다 */
+      if (!카메라그대로) 패드칸보이기(t.x, t.y);
       var h = ctrl.input({ type: 'hover', x: t.x, y: t.y });
       if (h) h.then(function () { refresh(); applyCursorImage(); });
       return true;
@@ -14864,7 +14960,7 @@
         for (var m = 0; m < 칸들.length; m++) if (칸들[m].x === 지.x && 칸들[m].y === 지.y) { j = m; break; }
         var 칸 = 칸들[j < 0 ? (d > 0 ? 0 : 칸들.length - 1) : (j + d + 칸들.length) % 칸들.length];
         if (R.center) 패드캠목표로(function () { R.center(칸.x, 칸.y); R.clampCamera(); R.apply(); });
-        return this.커서옮기기(칸.x, 칸.y);
+        return this.커서옮기기(칸.x, 칸.y, !!R.center);   /* 정본 394 — 카메라는 위에서 맞춤 */
       }
       /* 정본 373 ④ — 조작 중인 캐릭터(링 · 이동 칸 고르기 · 방향 고르기)가 있으면 그 조작을 닫고(취소를 평소 상태까지 이어 누름 = 원작 우클릭 −1)
        *   방금 캐릭터의 다음·이전 캐릭터로 · 행동 뒤 TP 가 남아 조작이 이어지는 때도 같다(그 캐릭터는 거기서 끝)
@@ -14885,13 +14981,19 @@
         return true;
       }
       if (!ctrl.모드인가('FRAME_IDLE') || !패드칸가능()) return false;
-      var c0 = ctrl.커서칸(), 기 = ctrl.readyUnits().filter(function (v) { return v.x === c0.x && v.y === c0.y; })[0] || null;
+      var c0 = ctrl.커서칸(), 후보0 = ctrl.readyUnits();
+      if (!후보0.length) 후보0 = (battle.units || []).filter(function (v) { return v && v.alive !== false && (v.side | 0) === 1; });   /* 정본 398 — 차례 없으면 아군 전부에서 «지금 캐릭터»를 찾는다(안 찾으면 늘 처음으로 돌아갔다) */
+      var 기 = 후보0.filter(function (v) { return v.x === c0.x && v.y === c0.y; })[0] || null;
       return this._다음아군(d, 기);
     },
     /** 기준 캐릭터(없으면 처음·끝)의 다음·이전 대기 아군으로 커서·카메라 — 기준이 방금 행동을 마쳐 대기열에서 빠졌어도 그 화면 자리에서 이어 간다 (정본 373) */
     _다음아군: function (d, 기준) {
       if (!ctrl.모드인가('FRAME_IDLE') || !패드칸가능()) return false;
-      var 대기 = ctrl.readyUnits().slice(); if (!대기.length) return false;
+      var 대기 = ctrl.readyUnits().slice();
+      /* 정본 398 — 차례 온 아군이 없을 때(스페이스로 멈춘 AI 페이즈 등)는 살아 있는 내 아군 전부를 돌아가며 커서·카메라만
+       *   (사장님 11-22 「ai페이즈일떄(스페이스로 멈췄을 때) 아군에 돌아온 턴이 없어도 l2 r2로 아군 캐릭터를 돌아가면서 선택할 수 있으면 좋겠어. 지금은 직접 스크롤해서 해당 캐릭터를 찾아야 해.」) */
+      if (!대기.length) 대기 = (battle.units || []).filter(function (v) { return v && v.alive !== false && (v.side | 0) === 1; });
+      if (!대기.length) return false;
       var 끼움 = !!(기준 && 대기.indexOf(기준) < 0); if (끼움) 대기.push(기준);
       var q = 화면왼쪽부터(대기), i = 기준 ? q.indexOf(기준) : -1, u = null;
       for (var 걸 = 1; 걸 <= q.length; 걸++) {
@@ -14903,8 +15005,14 @@
       /* 정본 373 — 링을 열 때와 같은 칸(그림 가운데 · 활이면 3칸 앞)을 겨냥한다 · 전에는 발 칸을 겨냥해 ○로 링을 열면 카메라가 한 번 더 움직였다
        *   (사장님 11-22 「아까 r2 l2는 포커싱 이동이랑 링커맨드 나오기전 캐릭터랑 카메라가 안맞음」) */
       if (R.center) 패드캠목표로(function () { var k = 링카메라칸(u); R.center(k.x, k.y); R.clampCamera(); R.apply(); });
-      return this.커서옮기기(u.x, u.y);
+      var 옮김 = this.커서옮기기(u.x, u.y, !!R.center);   /* 정본 394 — 카메라는 위에서 맞춤(끝 2칸 밀기를 또 하면 옛 화면 기준으로 엉뚱하게 밀었다) */
+      /* 정본 404 — 설정 «바로 링 열기»면 차례 온 아군은 곧바로 링 커맨드(○ 와 같은 길 · 링은 화면이 멈춘 뒤 보인다 — 정본 394 링따라가기) · 차례 아닌 아군(AI 페이즈 돌기)은 링을 안 연다 */
+      var 설정L2R2 = '커서'; try { 설정L2R2 = (window.G2Pad && G2Pad.불러오기 && G2Pad.불러오기().설정.L2R2) || '커서'; } catch (eL2) {}
+      if (옮김 && 설정L2R2 === '링' && ctrl.readyUnits().indexOf(u) >= 0) this.누르기();
+      return 옮김;
     },
+    /** 정본 397 — □ 를 누르고 있는 동안(커서 칸이 비어 상태창이 안 열릴 때) 화면 안 아군·적 HP 전부 · 암전 없이 (사장님 11-22 「아무도 선택되지 않았을때, 네모를 누르고 있는동안 아군과 적 hp가 표시되면 좋겠어. 링커맨드 선택시 표시되듯이. 암전은 생기면 안되고.」) */
+    값보기: function (v) { v = !!v && ctrl.모드인가('FRAME_IDLE'); if (v === 네모값보기) return; 네모값보기 = v; refresh(); },
     /** 커서 칸 유닛의 상태창 — 원작은 링 상태 아이콘으로만 연다 [리마스터] (설계서 6절 «네모») */
     상태창: function () {
       if (!ctrl.모드인가('FRAME_IDLE') || !패드칸가능()) return false;
@@ -15313,6 +15421,7 @@
     /* ★ 방향 화살표 선택 중(FACING_SELECT)에는 가장자리 스크롤 금지 — 커서로 방향 조절할 때
      *   화면 끝에서 맵이 밀리면 안 된다. */
     if (!mouse.inside || ctrl.모드인가('STATUS_VIEW') || ctrl.facingDraft()) return null;
+    if (window.__패드커서숨김) return null;   /* 정본 394 — 패드·손가락으로 조작하는 동안은 가장자리 스크롤 없음(진짜 마우스를 움직이면 pad_input 이 풀어 다시 된다) */
     /* ★★★★★ **`[0x75008]` 이 0 이면 맵을 못 민다** (2026-08-27 · 사용자 피드백 ⑤)
      *
      *   > 「시나리오 시작하자마자 **마우스스크롤과(실제 스크롤도 작동함) 티피구체가
@@ -16992,6 +17101,7 @@
      *   맵으로 내려가지 못합니다 (공격·마법이 통째로 안 되던 원인).
      *   원본도 링을 닫은 뒤 0x4A483 대상 선택 루프로 들어갑니다. */
     if (!ctrl.모드인가('STATUS_VIEW')) ringHidden = false;
+    try { 링따라가기(); } catch (e링따) {}   /* 정본 394 — 링을 유닛 화면 자리에 붙이고, 화면이 멈추면 연다 */
     var open = (G2Ring.isOpen() && ringMode() && !ringHidden && !ringCamWait) || !!부활창;   /* [리마스터 부활선택] 창이 떠 있는 동안 링 캔버스가 입력을 받는다 */
     /* 스테이터스 창도 링과 같은 회색 바탕을 씁니다.
      * (원본 0x493A3 은 맵을 다시 그린 위에 그대로 얹지만, 읽기 힘들어 우리는 덮습니다.)

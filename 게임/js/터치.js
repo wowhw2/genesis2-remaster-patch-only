@@ -33,7 +33,9 @@
   function 쏘기(종류, x, y, 단추) {
     var el = document.elementFromPoint(x, y) || document.body;
     var 눌림 = (종류 === 'mouseup' || 종류 === 'click' || 종류 === 'mousemove' && !(지금 && 지금.움직임)) ? 0 : (단추 === 2 ? 2 : 1);
-    el.dispatchEvent(new MouseEvent(종류, { bubbles: true, cancelable: true, view: root, clientX: x, clientY: y, screenX: x, screenY: y, button: 단추 || 0, buttons: 눌림 }));
+    root.__터치마우스 = true;   /* 정본 393 — 받는 쪽이 «손가락에서 온 마우스»인지 안다(전투 방향 고르기 오접촉 거르기) · 동기 디스패치라 바로 끈다 */
+    try { el.dispatchEvent(new MouseEvent(종류, { bubbles: true, cancelable: true, view: root, clientX: x, clientY: y, screenX: x, screenY: y, button: 단추 || 0, buttons: 눌림 })); }
+    finally { root.__터치마우스 = false; }
   }
   function 키(이름) {
     ['keydown', 'keyup'].forEach(function (t) {
