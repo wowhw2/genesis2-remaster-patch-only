@@ -230,6 +230,32 @@
       .then(function (t) { 튕김글 = t || ''; }, function () { });
     Promise.all([환경, 트랙(2), 트랙(11), 설치CD, 튕김]).then(function () { 배경음점검 = 결과; }, function () { 배경음점검 = 결과; });
   }
+  /* ★ 정본 410 — 배경음 재생이 실패하면(audio.js «[BGM] 원본 CD 를 못 읽었습니다») 하루 한 번 배경음 점검을 돌려 «배경음진단_…zip» 으로 보낸다
+   *   사장님 11-23 「같은 원본으로 설치했는데 윈도우판은 배경음이 나오는데, 안드로이드(ayn thor)게임기에서는 안나온다는 제보도 있어」·
+   *   「아까 bgm문제 관련하여 윈도우, 안드로이드스마트폰은 잘 작동하는데, 아까 말한 안드로이드 게임기에서만 배경음이 안나온다고 하네. 이부분도 확인꼭 해줘.」
+   *   성능 기록(AYN Thor · 웹뷰 크롬 109)에는 «트랙 11 을 안 틉니다»만 있고 까닭(CD 경로·/CD 응답·설치 폴더)이 없었다 — 신고자에게 되물을 수 없다
+   *   앱(PC)·휴대폰만 · 이용 안내 «오류 기록» 수집 · 하루 한 번 */
+  var 배경음진단보냄 = false;
+  function 배경음진단보내기(까닭) {
+    if (배경음진단보냄 || !(모바일 || root.G2앱)) return false;
+    try { if (navigator.webdriver) return false; } catch (e웹) { }
+    var 오늘 = new Date().toISOString().slice(0, 10);
+    try { if (localStorage.getItem('g2.배경음진단날') === 오늘) return false; localStorage.setItem('g2.배경음진단날', 오늘); } catch (e날) { }
+    배경음진단보냄 = true;
+    try { 배경음살피기(); } catch (e살) { return false; }
+    var 기다림 = 0;
+    (function 보면() {
+      if (배경음점검 && 배경음점검.상태 === '재는 중' && ++기다림 < 40) { setTimeout(보면, 250); return; }
+      try {
+        var 정보 = 모으기('배경음 진단(저절로) — ' + (까닭 || ''));
+        var 엔 = new TextEncoder(), 때 = new Date(), 붙 = function (n) { return (n < 10 ? '0' : '') + n; };
+        var 이름 = '배경음진단_' + (모바일 ? '휴대폰' : 'PC') + '_' + 때.getFullYear() + 붙(때.getMonth() + 1) + 붙(때.getDate()) + '_' + 붙(때.getHours()) + 붙(때.getMinutes()) + 붙(때.getSeconds()) + '.zip';
+        var zip = zip만들기([{ 이름: '정보.json', 바이트: 엔.encode(JSON.stringify(정보, null, 1)) }, { 이름: '콘솔끝.txt', 바이트: 엔.encode(기록.slice(-80).join('\n')) }]);
+        fetch(휴대폰신고주소, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ 이름: 이름, 설명: String(정보.설명).slice(0, 1000), zip: 바64(zip) }) }).catch(function () { });
+      } catch (e보) { }
+    })();
+    return true;
+  }
   function 열기() {
     if (창) return;
     try { 배경음살피기(); } catch (e배) { 배경음점검 = { 상태: '못 잼 ' + (e배 && e배.message) }; }
@@ -312,7 +338,7 @@
     if (e.key === 'F8') { e.preventDefault(); e.stopPropagation(); if (창) 닫기(); else 열기(); }
   }, true);
 
-  var API = { 이용안내글: 이용안내글, 열기: 열기, 닫기: 닫기, 모으기: 모으기, 기록: function () { return 기록.slice(); }, 판: 판, _zip: zip만들기, _바64: 바64, _만들기: function (보내기) { return 만들기(보내기); } };   /* _ 셋은 시험용 */
+  var API = { 이용안내글: 이용안내글, 배경음진단보내기: 배경음진단보내기, 열기: 열기, 닫기: 닫기, 모으기: 모으기, 기록: function () { return 기록.slice(); }, 판: 판, _zip: zip만들기, _바64: 바64, _만들기: function (보내기) { return 만들기(보내기); } };   /* _ 셋은 시험용 */
   root.G2버그신고 = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);
