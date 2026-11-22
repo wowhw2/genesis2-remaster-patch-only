@@ -131,12 +131,12 @@
   /* ── 정본 408 — 성능 수집: 끊김·느림이 나면 «그 순간» 앞뒤 수치와 하던 일을 묶어 두고, 게임이 한가할 때 신고 받는 곳으로 보낸다 ──
    *   사장님 11-22 「지금 패치로 다른사람들 실행기에 넣고(그래프는 띄우지는 않고 측정 기능만 넣고) 문제 상황이 생기면 자동으로 해당 상황과
    *   수치 등을 전송해서 데이터 수집을 할 수 없냐는 소리야.」·「지금 비정상 종료처럼」·「그래프는 띄우면 게임에 방해되니까 띄우지 말고」·
-   *   「계속 보내지거나 그래서 게임에 지장생기지는 않을까?」 · 고르심 «켜 둠 + 끄는 칸»(게임 설정 › 일반 › 성능 기록 보내기)
+   *   「계속 보내지거나 그래서 게임에 지장생기지는 않을까?」 · 고르심 «켜 둠 + 끄는 칸» → 11-23 «동의해야 게임 (끄는 칸 없음)»(정본 409 · bug_report.js 이용 안내)
    *   ★ 기록은 그 자리에서(그때 돌던 연출 · 장면 · 입력 · 앞뒤 프레임) · 보내기는 나중에 한가할 때 — 보내는 일이 끊김을 보태지 않게
    *   ★ 보내는 것은 앱(PC)·휴대폰에서만 — 개발 브라우저·헤드리스 시험은 모으기만 하고 안 보낸다
    *   한도: 같은 까닭은 한 번 켤 때 한 번 · 잡기 20초에 한 번 · 한 번 켤 때 6건 · 보내기 3분에 한 번 · 한 번 켤 때 3번 · 하루 8번 */
   var 수집 = (function () {
-    var 켬2 = true; try { if (localStorage.getItem('g2.성능수집') === '0') 켬2 = false; } catch (e) { }
+    var 켬2 = true;   /* 정본 409 — 끄는 칸 없음: 처음 켤 때 이용 안내 동의(bug_report.js)가 곧 수집 동의 · 켜기()는 시험용 */
     var 모바일 = /[?&]모바일=1/.test(물음), 보냄가능 = false;
     try { 보냄가능 = (!!root.G2앱 || 모바일) && !navigator.webdriver; } catch (e) { }
     var 받는곳 = 'https://script.google.com/macros/s/AKfycbyWAiC12QPSOFv7RvUnGeJSHEbyY1YHKQQeD7mR_6XUlIhv3WrGmR-zCyBgBLtvotZU/exec';   /* bug_report.js 휴대폰신고주소 와 같게 */
@@ -286,7 +286,7 @@
     return {
       걸기: 걸기2, 장: 장, 일: 일,
       켜짐: function () { return 켬2; },
-      켜기: function (v) { 켬2 = !!v; try { localStorage.setItem('g2.성능수집', 켬2 ? '1' : '0'); } catch (e) { } if (!켬2) 대기.length = 0; return 켬2; },
+      켜기: function (v) { 켬2 = !!v; if (!켬2) 대기.length = 0; return 켬2; },
       대기: function () { return 대기.slice(); },
       최근일: function () { return 최근일.slice(); },
       보낼수있나: function () { return !!보낼수있나(); },
