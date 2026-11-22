@@ -143,7 +143,7 @@
   var 수집 = (function () {
     var 켬2 = true;   /* 정본 409 — 끄는 칸 없음: 처음 켤 때 이용 안내 동의(bug_report.js)가 곧 수집 동의 · 켜기()는 시험용 */
     var 모바일 = /[?&]모바일=1/.test(물음), 보냄가능 = false;
-    try { 보냄가능 = (!!root.G2앱 || 모바일) && !navigator.webdriver; } catch (e) { }
+    try { 보냄가능 = (!!root.G2앱 || 모바일) && !navigator.webdriver && !/[?&]gputest=1/.test(물음); } catch (e) { }   /* gputest — 최적화 측정 크롬(정본 400) · 11-23 측정 창 모바일=1 기록이 «휴대폰»으로 드라이브에 올라갔다 */
     var 받는곳 = 'https://script.google.com/macros/s/AKfycbyWAiC12QPSOFv7RvUnGeJSHEbyY1YHKQQeD7mR_6XUlIhv3WrGmR-zCyBgBLtvotZU/exec';   /* bug_report.js 휴대폰신고주소 와 같게 */
     var 히치ms = 66, 느림ms = 40;   /* 히치 = 한 장이 60fps 네 장 넘게 걸림 · 느림 = 1초 평균이 25fps 아래로 3초 넘게 */
     var 최근일 = [], 대기 = [], 잡은까닭 = {}, 잡은수 = 0, 마지막잡기 = -1e9, 마지막보냄 = -1e9, 보낸수 = 0, 잡는중 = null;

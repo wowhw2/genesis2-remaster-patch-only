@@ -4698,7 +4698,7 @@ window.G2_셸이몬다 = true;
      *   처음 쓸 때 한 번 지어 둔다 · 지어지기 전에는 비워 둔다 · 여백 없으면 아무것도 안 함 */
     var _돌무늬 = null, _돌무늬받는중 = false;
     /* 정본 400 — 돌 무늬를 켠 지 5초 뒤 미리 나눠 지어 둔다(게임설정 창·넓은 화면 상태창을 처음 열 때 멈추지 않게) */
-    setTimeout(function () { try { if (window.G2GameSettings && G2GameSettings.돌무늬받기 && window.G2Native && G2Native.decodePcx) G2GameSettings.돌무늬받기(바이트); } catch (e) { } }, 5000);
+    setTimeout(function () { try { if (window.G2GameSettings && G2GameSettings.돌무늬받기 && window.G2Native && G2Native.decodePcx) G2GameSettings.돌무늬받기(바이트, true); }   /* true = 한가할 때만 (전투 로딩과 안 겹치게) */ catch (e) { } }, 5000);
     function 돌무늬짓기(srcs, OW, OH, 씨앗) {
       var B = 12, O = 4, S = B - O, 후보 = [];
       [[0, 0, 164, 77, 35], [1, 178, 7, 118, 17]].forEach(function (k) {

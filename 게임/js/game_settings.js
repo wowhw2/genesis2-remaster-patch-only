@@ -825,7 +825,7 @@ function 돌무늬짓기(srcs, OW, OH, 씨앗) {
  *   한 번에 지으면 블록 1,500개 × 후보 약 2,200개를 견줘 600ms(측정 크롬) 동안 화면이 멈췄다 —
  *   사장님 PC 기록(성능기록_PC_20261123_004003 · 「게임설정 창 열기」 직후 846ms) · 게임.html 옆무늬채우기(넓은 화면 상태·장비 창 양옆)도 같은 것을 또 지었다
  *   ⇒ 한 번에 «조각»(기본 5ms)만 계산하고 메시지 채널로 다음 태스크에 이어 간다 · 두 곳이 한 결과를 같이 쓴다 · 게임을 켠 뒤 한가할 때 미리 시작(아래 돌무늬미리) */
-var _돌무늬약속 = null, _돌무늬틀 = null;
+var _돌무늬약속 = null, _돌무늬틀 = null, _돌무늬급함 = false;   /* 급함 — 누군가 실제로 기다린다(게임설정 창·상태창) · 아니면 한가할 때만 짓는다 */
 function 돌무늬나눠짓기(srcs, OW, OH, 씨앗, 조각ms) {
   return new Promise(function (다) {
     var B = 12, O = 4, S = B - O, 후보 = [];
@@ -834,7 +834,9 @@ function 돌무늬나눠짓기(srcs, OW, OH, 씨앗, 조각ms) {
     });
     var r = 씨앗 >>> 0 || 1, 난 = function () { r ^= r << 13; r ^= r >>> 17; r ^= r << 5; return (r >>> 0) / 4294967296; };
     var out = new Int16Array(OW * OH).fill(-1), by = 0, bx = 0, 한도 = 조각ms || 5;
-    var 다음 = (typeof MessageChannel === 'function') ? (function () { var mc = new MessageChannel(), f = null; mc.port1.onmessage = function () { var g = f; f = null; if (g) g(); }; return function (g) { f = g; mc.port2.postMessage(0); }; })() : function (g) { setTimeout(g, 0); };
+    var 바로 = (typeof MessageChannel === 'function') ? (function () { var mc = new MessageChannel(), f = null; mc.port1.onmessage = function () { var g = f; f = null; if (g) g(); }; return function (g) { f = g; mc.port2.postMessage(0); }; })() : function (g) { setTimeout(g, 0); };
+    /* 미리 짓기(아무도 안 기다림)는 브라우저가 한가할 때만 — 전투 로딩과 겹쳐 CPU 를 나눠 먹었다(측정 크롬 1-1A 3D 로딩 프로파일: 조각 637ms) · 누가 기다리면(_돌무늬급함) 바로 이어 짓는다 */
+    var 다음 = function (g) { if (!_돌무늬급함 && typeof requestIdleCallback === 'function') requestIdleCallback(function () { g(); }, { timeout: 3000 }); else 바로(g); };
     function 조각() {
       var 끝 = (typeof performance !== 'undefined' ? performance.now() : Date.now()) + 한도;
       while (by < OH) {
@@ -862,7 +864,8 @@ function 돌무늬나눠짓기(srcs, OW, OH, 씨앗, 조각ms) {
   });
 }
 /** 돌 무늬 바탕(480×200 · 씨앗 12345) 하나를 나눠 지어 같이 쓴다 — 게임설정 창 · 게임.html 넓은 화면 옆 무늬 */
-function 돌무늬받기(바이트) {
+function 돌무늬받기(바이트, 한가) {
+  if (!한가) _돌무늬급함 = true;
   if (_돌무늬약속) return _돌무늬약속;
   var N = root.G2Native;
   _돌무늬약속 = Promise.all([바이트('STATUS.PCX'), 바이트('EQUMENT.PCX')]).then(function (b) {
