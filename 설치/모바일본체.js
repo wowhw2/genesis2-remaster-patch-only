@@ -204,6 +204,12 @@ const 안드까닭 = { 1: ['끔', '앱이 스스로 끝냄'], 2: ['기록 없이
   6: ['튕김', '응답 없음(ANR)'], 7: ['튕김', '시작 실패(INITIALIZATION_FAILURE)'], 8: ['끔', '권한 바뀜'], 9: ['튕김', '자원 과다 사용(EXCESSIVE_RESOURCE_USAGE)'],
   10: ['끔', '사용자가 닫음(USER_REQUESTED)'], 11: ['끔', '사용자가 멈춤(USER_STOPPED)'], 12: ['기록 없이 꺼짐', '의존 프로세스 끝남'], 13: ['기록 없이 꺼짐', '그 밖(OTHER)'],
   14: ['기록 없이 꺼짐', '얼림(FREEZER)'], 15: ['끔', '패키지 상태 바뀜'], 16: ['끔', '앱 업데이트'] };
+/* 정본 400 — 지난 실행의 «마지막 상태»(게임 화면이 30초마다 /laststate 로 보낸 화면·맵·3D·메모리 등) — 이번에 튕김이 새로 적히면 그 뒤에 한 줄 붙인다
+ *   ☠ 메모리 부족(LOW_MEMORY) 튕김은 앱이 꺼지기 전에 아무것도 못 남겨 무엇을 하다 꺼졌는지 몰랐다(11-23 튕김기록_휴대폰_20261123_080341)
+ *   사장님 11-23 「혹시 더 수집 필요한 항목이 필요하다면 동의 공지에 추가하면 돼」 — 이용 안내 «끊김 전후의 게임 진행 기록과 메모리 사용량» 안 */
+const 마지막상태파일 = path.join(데이터, '마지막상태.json');
+let 지난상태 = ''; try { 지난상태 = fs.readFileSync(마지막상태파일, 'utf8').slice(0, 2000); fs.unlinkSync(마지막상태파일); } catch (e) { }
+let 이번튕김수 = 0;
 (function 종료까닭읽기() {
   const 후보 = [path.join(path.dirname(데이터), '종료까닭.txt'),                                            /* 아이폰 — 문서 폴더(데이터 = 문서/data) */
     ...바깥폴더후보.map(d => path.join(path.dirname(d), '종료까닭.txt'))];                                     /* 안드로이드 — 앱 폴더(files) */
@@ -220,18 +226,21 @@ const 안드까닭 = { 1: ['끔', '앱이 스스로 끝냄'], 2: ['기록 없이
       if (!줄.trim() || 본줄.has(줄)) continue;
       본줄.add(줄);
       const k = 줄.split('\t');
-      if (k[0] === 'IOS') { 튕김적기(k[1] === '끔' ? '끔' : '튕김', '아이폰 ' + k.slice(2).join(' · ')); continue; }   /* IOS \t 갈래 \t 내용 … */
+      if (k[0] === 'IOS') { if (k[1] !== '끔') 이번튕김수++; 튕김적기(k[1] === '끔' ? '끔' : '튕김', '아이폰 ' + k.slice(2).join(' · ')); continue; }   /* IOS \t 갈래 \t 내용 … */
       const 때 = new Date(+k[0] || 0).toISOString(); let 까 = 안드까닭[+k[1]] || ['기록 없이 꺼짐', '까닭 ' + k[1]];
       /* 정본 371 — 메모리 부족(3)이라도 그때 앱이 화면 앞이 아니었으면(중요도 > 125 · 100 = 화면 앞 · 200 = 보임 · 400 = 뒤) 휴대폰이 뒤에 있는 앱을 정리한 것 — 튕김이 아니다
        *   (튕김기록_휴대폰_20261122_135849 — LOW_MEMORY · PSS 28MB) · 중요도 칸(k[6])이 없는 옛 앱 기록은 그대로 */
       const 중 = k[6] != null && k[6] !== '' ? +k[6] : NaN;
       if (+k[1] === 3 && 중 > 125) 까 = ['기록 없이 꺼짐', '메모리 부족 — 뒤에 있을 때 휴대폰이 정리(중요도 ' + 중 + ')'];
+      if (까[0] === '튕김') 이번튕김수++;
       튕김적기(까[0], '안드로이드 지난 종료 ' + 때 + ' · ' + 까[1] + ' · 상태 ' + k[2] + ' · 메모리 PSS ' + Math.round((+k[3] || 0) / 1024) + 'MB · RSS ' + Math.round((+k[4] || 0) / 1024) + 'MB' + (k[5] && k[5] !== 'null' ? ' · ' + k[5] : '') + (isNaN(중) ? '' : ' · 중요도 ' + 중));
     }
     읽음[f] = 글.length;
   }
   try { fs.mkdirSync(데이터, { recursive: true }); fs.writeFileSync(까닭읽음파일, JSON.stringify(읽음)); } catch (e) { }
 })();
+/* 정본 400 — 이번에 튕김이 새로 적혔으면 지난 실행의 마지막 상태를 붙인다(상태 «때»와 종료 시각을 견주면 그 튕김의 상태인지 안다) */
+if (이번튕김수 && 지난상태) 튕김적기('마지막 상태', 지난상태);
 튕김적기('켬', '본체 ' + (process.env.G2M_본체 || '?') + ' · ' + process.platform + ' ' + process.arch + ' · node ' + process.version);
 /* zip(저장 방식) — 데스크톱 main.js 와 같은 꼴 */
 function zip묶기(목록) {
@@ -296,6 +305,13 @@ http.createServer(async (req, res) => {
     /* 정본 362 — CD 점검(버그 신고가 읽는다 · 게임 화면은 다른 포트라 허용 머리) — CD폴더·원본 폴더의 파일 이름·크기와 cue 안 FILE·트랙 수
      *   사장님은 신고자에게 되물을 수 없다(11-21) → 배경음이 안 날 때 «무엇이 들어 있나»를 신고 한 번으로 본다 */
     /* 정본 371 — 튕김 기록 창구: GET = 기록 글(버그 신고가 담는다) · POST = 게임 화면 오류 한 줄(기록만 · 보내지 않음) · 게임 화면은 다른 포트라 허용 머리 */
+    /* 정본 400 — 마지막 상태(게임 화면이 30초마다 · 뒤로 넘어갈 때) — 파일 하나에 덮어쓴다 · 다음에 켤 때 튕김이 있으면 붙인다(위 지난상태) */
+    if (p === '/laststate' && req.method === 'POST') {
+      let 몸 = ''; req.on('data', d => { if (몸.length < 4000) 몸 += d; });
+      req.on('end', () => { try { fs.mkdirSync(데이터, { recursive: true }); fs.writeFileSync(마지막상태파일, 몸.slice(0, 2000)); } catch (e) { }
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Access-Control-Allow-Origin': '*' }); res.end('ok'); });
+      return;
+    }
     if (p === '/crashlog') {
       const 머리 = { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' };
       if (req.method === 'POST') {

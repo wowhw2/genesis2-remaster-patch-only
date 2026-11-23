@@ -169,6 +169,10 @@
       try { if (root.ctrl) o.모드 = root.ctrl.mode; } catch (e) { }
       try { var b = root.battle; if (b) o.턴 = b.turn + '/' + b.phase; } catch (e) { }
       try { o.보기3D = localStorage.getItem('리마스터3D보기') || ''; } catch (e) { }
+      /* 정본 400 — 실제 화면 상태(보기3D 는 설정 저장값이라 거의 비어 있었다 · 11-23 기록 열세 개에서 3D 그리기가 잡혔는데도 빈칸) */
+      try { var R0 = root.R; if (R0 && R0.cam) { o.기울기 = Math.round(R0.cam.tilt || 0); o.켬3D = !!(R0.host && R0.host.classList && R0.host.classList.contains('g2-3d맵')); } } catch (e) { }
+      try { if (root.G2Scaler && root.G2Scaler.cur) o.스케일러 = root.G2Scaler.cur(); } catch (e) { }
+      try { var O0 = root.G2Opt; if (O0 && O0.실효배속) o.배속 = O0.실효배속(); } catch (e) { }
       try { var F = root.G2Fx; if (F) { o.날씨 = F.wKind + ':' + F.wStep; o.이펙트 = (F.active ? F.active.length : 0) + (F.screenActive ? F.screenActive.length : 0); } } catch (e) { }
       return o;
     }
@@ -194,6 +198,24 @@
         F.play = function (name) { 일('이펙트 ' + name); return 원2.apply(this, arguments); };
         F.play.__수집 = true;
       }
+    }
+    /* 정본 400 — 긴 장 기록(Long Animation Frames · 크롬 123+) — 그 장에서 오래 걸린 스크립트(파일·함수·부른 쪽)·강제 배치·그리기 시작
+     *   ☠ 큰 끊김이 «GPU»(잰 구간 밖)로만 남아 무엇이 막았는지 몰랐다(11-23 · 173ms·350ms 등) · 없는 브라우저는 긴 작업(longtask)만 */
+    var 긴장 = [];
+    try {
+      new PerformanceObserver(function (목) {
+        목.getEntries().forEach(function (e) {
+          긴장.push({ t: e.startTime, ms: Math.round(e.duration), 막힘: Math.round(e.blockingDuration || 0),
+                      그리기전: Math.round((e.renderStart || e.startTime) - e.startTime), 스타일배치: Math.round(e.styleAndLayoutDuration || 0),
+                      스크립트: (e.scripts || []).slice().sort(function (a, b) { return b.duration - a.duration; }).slice(0, 4).map(function (s) {
+                        return { ms: Math.round(s.duration), 곳: String(s.sourceURL || '').split('/').pop().replace(/\?.*/, '') + ' ' + (s.sourceFunctionName || '') + '@' + (s.sourceCharPosition | 0),
+                                 부름: String(s.invoker || '').slice(0, 80), 강제배치: Math.round(s.forcedStyleAndLayoutDuration || 0) };
+                      }) });
+          if (긴장.length > 40) 긴장.shift();
+        });
+      }).observe({ type: 'long-animation-frame', buffered: false });
+    } catch (eL) {
+      try { new PerformanceObserver(function (목) { 목.getEntries().forEach(function (e) { 긴장.push({ t: e.startTime, ms: Math.round(e.duration), 긴작업: true }); if (긴장.length > 40) 긴장.shift(); }); }).observe({ type: 'longtask', buffered: false }); } catch (eT) { }
     }
     addEventListener('keydown', function (e) { if (!e.repeat) 일('키 ' + e.key); }, true);
     addEventListener('pointerdown', function (e) { 일('누름 ' + (e.pointerType || '')); }, true);
@@ -225,7 +247,9 @@
       if (잡은까닭[키]) return;
       잡은까닭[키] = 1; 마지막잡기 = t;
       잡는중 = { 때: new Date().toISOString(), t: t, 까닭: [까닭], 큰구간: 큰, 상황: o, 도는연출: 연출,
-                 장면바뀐뒤ms: Math.round(t - 장면바뀐때), 켠뒤초: Math.round(t / 1000) };
+                 장면바뀐뒤ms: Math.round(t - 장면바뀐때), 켠뒤초: Math.round(t / 1000),
+                 벽: Date.now() - (performance.now() - t) };   /* 정본 400 — 콘솔 줄(UTC 시각)과 맞출 벽시계 */
+      try { if (performance.memory) 잡는중.메모리MB = Math.round(performance.memory.usedJSHeapSize / 1048576) + ' / ' + Math.round(performance.memory.jsHeapSizeLimit / 1048576); } catch (eM) { }   /* 정본 400 — 메모리 부족 튕김 대비 */
       setTimeout(마무리, 1500);   /* 뒤 1.5초까지 담는다 — 끊김이 이어지는지 */
     }
     function 마무리() {
@@ -233,7 +257,18 @@
       c.프레임머리 = ['ms(이상 기준)', 'Frame', 'Game', 'Draw', 'GPU', '세부'];
       c.프레임 = 기록.filter(function (줄) { return 줄.때 >= c.t - 3000; }).map(function (줄) { return 짧은줄(줄, c.t); });
       c.하던일 = 최근일.filter(function (x) { return (x.끝t || x.t) >= c.t - 15000; }).map(function (x) { return Math.round(x.t - c.t) + 'ms ' + x.일 + (x.n ? ' ×' + x.n : ''); });
-      delete c.t;
+      /* 정본 400 — 그 앞뒤(−3초 ~ +1.5초)의 긴 장 기록과 콘솔 줄 · ☠ 전에는 보낼 때의 마지막 40줄만 담아 끊김 순간의 줄이 빠졌다(11-23 1-10 13턴) */
+      c.긴장 = 긴장.filter(function (e) { return e.t >= c.t - 3000 && e.t <= c.t + 1600; }).map(function (e) { var o = {}; for (var k in e) o[k] = e[k]; o.t = Math.round(e.t - c.t); return o; });
+      try {
+        var 신고0 = root.G2버그신고, 줄들 = 신고0 && 신고0.기록 ? 신고0.기록() : [], 하루 = 86400000, 벽일 = c.벽 % 하루;
+        c.콘솔 = 줄들.filter(function (s) {
+          var m = /^(\d\d):(\d\d):(\d\d)\.(\d\d\d)/.exec(s); if (!m) return false;
+          var ms = ((+m[1] * 60 + +m[2]) * 60 + +m[3]) * 1000 + +m[4], 차 = ms - 벽일;
+          if (차 > 하루 / 2) 차 -= 하루; else if (차 < -하루 / 2) 차 += 하루;   /* 자정 넘김 */
+          return 차 >= -3000 && 차 <= 1600;
+        }).slice(-30).map(function (s) { return s.slice(0, 200); });   /* 1회 약 10KB 를 넘지 않게(이용 안내) */
+      } catch (eC) { }
+      delete c.t; delete c.벽;
       대기.push(c); 잡은수++;
       try { console.warn('[성능 수집] ' + c.까닭[0] + ' · ' + (c.상황.셸 || '') + ' ' + (c.상황.맵 || '') + ' · 큰 구간 ' + c.큰구간 + ' · 연출 ' + (c.도는연출.join(' / ') || '없음')); } catch (e) { }
     }

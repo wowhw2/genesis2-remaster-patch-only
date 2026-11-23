@@ -210,6 +210,26 @@
     var 화면오류 = function (글) { if (++화면오류수 > 30) return; try { fetch('http://127.0.0.1:47861/crashlog', { method: 'POST', mode: 'no-cors', body: String(글).slice(0, 3000) }).catch(function () { }); } catch (e) { } };
     root.addEventListener('error', function (e) { 화면오류((e && e.message) + ' @ ' + (e && e.filename || '').replace(/^.*\//, '') + ':' + (e && e.lineno) + ' ' + (e && e.error && e.error.stack || '')); });
     root.addEventListener('unhandledrejection', function (e) { 화면오류('약속 오류 ' + (e && e.reason && (e.reason.stack || e.reason.message) || e && e.reason)); });
+    /* 정본 400 — 마지막 상태: 30초마다 · 뒤로 넘어갈 때 본체 «/laststate» 에 덮어쓴다 — 메모리 부족 튕김처럼 꺼지기 전에 아무것도 못 남기는 때를 위해
+     *   다음에 켤 때 튕김이 있으면 본체가 튕김 기록에 한 줄 붙인다 (이용 안내 «끊김 전후의 게임 진행 기록과 메모리 사용량» 안 · 사장님 11-23) */
+    var 마지막상태보내기 = function () {
+      try {
+        var o = { 때: new Date().toISOString(), 켠뒤초: Math.round(performance.now() / 1000) };
+        try { o.화면 = root.__셸 && root.__셸.수명주기 ? root.__셸.수명주기().화면 || '' : ''; } catch (e1) { }
+        try { var G = root.G2; o.맵 = G && G.scene ? G.scene._시나리오 || G.scene['맵파일'] || '' : ''; } catch (e2) { }
+        try { if (root.ctrl) o.모드 = root.ctrl.mode; if (root.battle) o.턴 = root.battle.turn + '/' + root.battle.phase; } catch (e3) { }
+        try { var R0 = root.R; if (R0 && R0.cam) { o.기울기 = Math.round(R0.cam.tilt || 0); o.켬3D = !!(R0.host && R0.host.classList && R0.host.classList.contains('g2-3d맵')); } } catch (e4) { }
+        try { if (root.G2Scaler && root.G2Scaler.cur) o.스케일러 = root.G2Scaler.cur(); } catch (e5) { }
+        try { if (performance.memory) o.메모리MB = Math.round(performance.memory.usedJSHeapSize / 1048576) + ' / ' + Math.round(performance.memory.jsHeapSizeLimit / 1048576); } catch (e6) { }
+        /* 캔버스 — 그림 메모리를 가장 많이 먹는다(화면에 붙은 것만 셈) */
+        try { var cs = document.getElementsByTagName('canvas'), 화소 = 0; for (var ci = 0; ci < cs.length; ci++) 화소 += (cs[ci].width * cs[ci].height) || 0; o.캔버스 = cs.length + '장 ' + (화소 / 1e6).toFixed(1) + 'M화소'; o.요소 = document.getElementsByTagName('*').length; } catch (e7) { }
+        fetch('http://127.0.0.1:47861/laststate', { method: 'POST', mode: 'no-cors', body: JSON.stringify(o) }).catch(function () { });
+      } catch (e) { }
+    };
+    if (root.document && root.document.addEventListener && typeof setInterval === 'function') {   /* 화면·타이머가 있을 때만(노드 시험에서는 안 건다) */
+      setInterval(function () { if (!root.document.hidden) 마지막상태보내기(); }, 30000);
+      root.document.addEventListener('visibilitychange', function () { if (root.document.hidden) 마지막상태보내기(); });
+    }
   }
   function 배경음살피기() {
     배경음점검 = { 상태: '재는 중' };
@@ -312,8 +332,9 @@
     '────────────────',
     '수집 항목',
     '────────────────',
-    '· 화면 끊김이나 속도 저하가 발생한 시점의 처리 시간',
+    '· 화면 끊김이나 속도 저하가 발생한 시점의 처리 시간과 오래 걸린 처리 부분',
     '· 당시 게임 상황 (진행 중인 맵, 턴, 사용한 기술 등)',
+    '· 끊김 전후의 게임 진행 기록(게임 로그)과 메모리 사용량',
     '· 게임 설정, 기기 정보 (기기 종류, 그래픽 카드, 화면 해상도)',
     '· 오류 및 비정상 종료 기록',
     '· 배경음악이 재생되지 않을 때의 원인 기록 (CD 위치, 음악 파일 응답)',
