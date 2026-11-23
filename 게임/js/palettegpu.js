@@ -239,6 +239,7 @@ function 텍스처올리기(판) {
   gl.deleteFramebuffer(fb);
   gl.useProgram(프로그램);
   gl.deleteTexture(판.tIdx); 판.tIdx = null;                  /* 표를 구웠으니 번호 텍스처는 더 안 쓴다 */
+  if (모음) { 판.쓴때 = ++쓴차례; 산판.push(판); 올린바이트 += 판.바이트; 모음.push(판); return true; }   /* 정본 400 — 모아 올리기 중: 검사는 모아올리기끝() 에서 한 번 */
   var 오류 = 0; try { 오류 = gl.getError(); } catch (e1) { }
   if (오류 && !gl.isContextLost()) {                          /* 메모리 모자람 등 — 빈 텍스처로 «칠했다» 하지 않는다 */
     오류수++; 판내리기(판); 예산맞추기(예산);                    /* 남은 판도 줄여 둔다 */
@@ -286,7 +287,22 @@ function 버리기(판) {
   판내리기(판);   /* 잃은 문맥의 텍스처는 이미 없다 — 판내리기가 세대를 보고 지우지 않는다 */
 }
 
-root.G2PaletteGPU = { 준비: 문맥준비, 판올리기: 판올리기, 칠하기: 칠하기, 버리기: 버리기,
+/* 정본 400 — 모아 올리기: 판 여럿을 올리는 동안 올린 뒤 검사(getError · 그래픽 카드 기다림)를 미루고 끝에 한 번만 한다
+ *   오류가 났으면 모아 올린 판을 모두 내린다(세대 −1) — 칠할 때 하나씩 다시 올리며 검사하고, 그래도 안 되면 CPU 길(같은 그림)
+ *   (갤럭시 S24+ 2-6 날씨 전환 첫 걸음 · 측정 크롬: 한 걸음에 판 72개 = getError 72번) · 부르는 쪽 render.js _행오버레이_다시칠하기 */
+var 모음 = null;
+function 모아올리기시작() { if (!모음) 모음 = []; }
+function 모아올리기끝() {
+  var 목 = 모음; 모음 = null;
+  if (!목 || !목.length || !gl) return 0;
+  var 오류 = 0; try { 오류 = gl.getError(); } catch (e1) { }
+  if (!오류 || gl.isContextLost()) return 0;
+  오류수++; 목.forEach(판내리기); 예산맞추기(예산);
+  try { if (오류수 <= 3) console.warn('[팔레트GPU] 모아 올리기 오류 ' + 오류 + ' — 판 ' + 목.length + '개를 내려 하나씩 다시 올린다'); } catch (e2) { }
+  return 목.length;
+}
+
+root.G2PaletteGPU = { 준비: 문맥준비, 판올리기: 판올리기, 칠하기: 칠하기, 버리기: 버리기, 모아올리기시작: 모아올리기시작, 모아올리기끝: 모아올리기끝,
                       쓰나: function () { return !!gl && !실패; },
                       /* [개발] 문맥 잃기 시험 — 잃었다 다시 잇는 길을 확인한다 */
                       잃어보기: function () { var e = gl && gl.getExtension('WEBGL_lose_context'); if (e) e.loseContext(); return !!e; },

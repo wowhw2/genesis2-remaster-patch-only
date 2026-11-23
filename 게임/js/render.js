@@ -2315,6 +2315,14 @@ function 행캔버스붙이기(e, cv, w, h) {
 Renderer.prototype._행오버레이_다시칠하기 = function (pal, 딱지) {
   var n = 0, 바탕 = this._palSaved || this._음영바탕 || pal, self = this;
   var 확대 = !!(root.G2Scaler && root.G2Scaler.N() > 1);
+  /* 정본 400 — 판을 먼저 다 올리고(모아 올리기 · 검사 한 번) 칠한다: 줄마다 올린 직후 getError 로 그래픽 카드를 기다려 날씨 전환 첫 걸음이 멈췄다
+   *   (palettegpu 모아올리기 주석) · 아래 고리의 확대판얻기 는 같은 판을 다시 쓴다 · 끄기 window.__팔레트GPU하나씩 */
+  var PG = root.G2PaletteGPU;
+  if (확대 && PG && PG.모아올리기시작 && !root.__팔레트GPU하나씩) {
+    PG.모아올리기시작();
+    try { (this._rowFlatEls || []).forEach(function (e) { if (e && e._조각) 확대판얻기(e, '행', e._조각, 바탕, e._바탕); }); }
+    finally { PG.모아올리기끝(); }
+  }
   (this._rowFlatEls || []).forEach(function (e) {
     if (!e || !e._조각) return;
     if (확대) {
