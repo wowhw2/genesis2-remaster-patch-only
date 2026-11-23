@@ -303,19 +303,34 @@
     try { var 셸 = root.__셸 && root.__셸.수명주기 ? root.__셸.수명주기().화면 : ''; if (셸 && 셸 !== 'BATTLE') return null; } catch (e) { }
     var 살아 = B.units.filter(function (u) { return u && u.alive !== false && !u.감춤 && u.hp > 0; });
     if (살아.length < 2) return null;
+    /* ★ 정본 436 — «몸» 층만 센다. 그림자(_shd) 캔버스까지 세면 몸이 비어도 «칠함»이 됐다
+     *   (신고 R0.1.93 9-8 «케릭터가그림자만남았어요»: 그림자 1888점 · 몸 0점인데 감시가 못 잡았다) */
     var 상자 = 0, 칠함 = 0;
     for (var i = 0; i < 살아.length && 상자 < 6; i++) {
       var e = R.unitEls[살아[i].id]; if (!e || e.style.display === 'none') continue;
+      var 층들 = (e._layers || []).filter(function (L) { return L && L.el && L.el.style.display !== 'none'; });
+      if (!층들.length) continue;   /* 지금 몸을 안 그리는 유닛(연출로 감춤 등)은 안 센다 */
       상자++;
-      var 캔 = e.querySelectorAll('canvas'); for (var k = 0; k < 캔.length; k++) if (점있나(캔[k])) { 칠함++; break; }
-      if (!캔.length && e.style.backgroundImage) 칠함++;
+      for (var k = 0; k < 층들.length; k++) {
+        var 판 = 층들[k].el._판;
+        if (판 && 판.style.display !== 'none' ? 점있나(판) : !!층들[k].el.style.backgroundImage) { 칠함++; break; }
+      }
       if (칠함) return false;   /* 하나라도 칠했으면 그만 읽는다 — 정상일 때는 유닛 하나만 읽는다 */
     }
+    if (!상자) return null;
     return 칠함 === 0;   /* 상자가 하나도 없어도 «안 보임» */
   }
-  function 유닛다시짓기() {
+  function 유닛다시짓기(GPU끔) {
     var R = root.R, B = root.battle;
-    B.units.forEach(function (u) { var e = u && R.unitEls[u.id]; if (e) e._layerSig = null; try { R.updateUnit(u); } catch (e2) { } });
+    /* ★ 정본 436 — 빈 그림이 담긴 장 캐시·유닛 GPU 판까지 비운다(상자만 다시 지으면 같은 빈 장을 또 칠했다)
+     *   두 번째(GPU끔)부터는 유닛 몸을 그래픽 카드 없이(CPU 길로) 칠한다 — render.js 유닛공급자 */
+    try {
+      var 바들 = R._유닛바탕, G = root.G2PaletteGPU;
+      if (바들 && G) Object.keys(바들).forEach(function (f) { var 판들 = 바들[f] && 바들[f].판; if (판들) Object.keys(판들).forEach(function (k) { if (판들[k]) G.버리기(판들[k]); }); });
+      R._유닛바탕 = null; R._uurl = {};
+    } catch (e1) { }
+    if (GPU끔) root.__유닛GPU끔 = true;
+    B.units.forEach(function (u) { var e = u && R.unitEls[u.id]; if (e) { e._layerSig = null; (e._layers || []).forEach(function (L) { if (L && L.el) L.el._url = null; }); } try { R.updateUnit(u); } catch (e2) { } });
     try { if (R.apply) R.apply(); } catch (e3) { }
   }
   function 유닛진단보내기(까닭) {
@@ -345,7 +360,11 @@
         console.warn('[유닛감시] 전투 유닛이 9초째 하나도 안 그려졌다 — 유닛 상자를 다시 짓는다');
         유닛다시짓기();
       }
-      if (유닛감시.연속 === 6) { console.warn('[유닛감시] 다시 지어도 안 보인다 — 진단을 보낸다'); 유닛진단보내기('다시 지어도 18초째 안 보임'); }
+      if (유닛감시.연속 === 6) {
+        console.warn('[유닛감시] 다시 지어도 안 보인다 — 그래픽 카드 없이 다시 짓고 진단을 보낸다');
+        유닛진단보내기('다시 지어도 18초째 안 보임');
+        유닛다시짓기(true);
+      }
     } catch (e) { }
   }, 3000);
   function 열기() {

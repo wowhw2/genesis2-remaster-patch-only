@@ -1521,7 +1521,7 @@ function 유닛공급자(self, file, pal) {
     유닛바탕주인._유닛바탕 = null;
   }
   유닛바탕주인 = self;
-  if (!(S && S.N() > 1) || !G || !G.준비()) return root.G2Native.spriteCanvasProvider(raw, pal);
+  if (!(S && S.N() > 1) || !G || root.__유닛GPU끔 || !G.준비()) return root.G2Native.spriteCanvasProvider(raw, pal);   /* __유닛GPU끔 — 정본 436 bug_report 유닛감시가 몸이 비면 켠다 */
   var 바들 = self._유닛바탕 || (self._유닛바탕 = {}), 바 = 바들[file];
   if (!바 || 바.raw !== raw || 바.N !== S.N() || 바.필터 !== S.cur()) {
     if (바 && 바.판) Object.keys(바.판).forEach(function (k) { if (바.판[k]) G.버리기(바.판[k]); });   /* 그래픽 카드 메모리를 비운다 */
