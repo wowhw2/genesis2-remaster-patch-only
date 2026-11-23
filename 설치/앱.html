@@ -192,6 +192,12 @@
     <section id="설치됨" hidden>
       <div class="판글" id="버전줄"></div>
       <div class="작은" id="설치됨말" hidden></div>
+      <!-- 정본 441 — 휴대폰 첫 화면(모바일/nodejs/설치.html 정본 410)과 같은 줄 · 같은 문구 · 같은 «cue 파일 연결» — 다시 설치하지 않고 cue 만 연결
+           (사장님 11-24 「그리고 해당 cue 만 연결할 수 있어야할거아니야!」·「왜 그걸 다시 설치를해!」·「모바일쪽이랑 일관성 있게해 자꾸 따로 처리할생각하지말고」) -->
+      <div class="패치" id="cue줄" hidden>
+        <span id="cue말">배경음악에 필요한 <b>.cue</b> 파일이 없습니다 — 창세기전 2 원본의 <b>GENESIS2.cue</b> 를 연결해 주세요.</span>
+        <button class="단추" id="cue단추">cue 파일 연결</button>
+      </div>
       <div class="경고" id="경고칸" hidden></div>
       <div class="패치" id="패치줄" hidden>
         <span id="패치말"></span>
@@ -202,7 +208,6 @@
         <!-- 정본 329 — 새로 설치해야 하는 버전이면 내려받기 페이지(구글 드라이브 공개 폴더)로 바로 · 새 창 열기는 main.js 가 기본 브라우저로 -->
         <a class="단추 주" id="새판받기" href="https://drive.google.com/drive/folders/1ciVwj-ZQwKllIVtUhS_xsmzqlCbU52-B?usp=drive_link" target="_blank" rel="noopener" hidden>내려받기 페이지 열기</a>
         <button class="단추 주" id="다시CD" hidden>원본 CD 로 다시 설치</button>
-        <button class="단추 주" id="CD연결" hidden>CD 이미지 연결…</button>
         <button class="단추 주" id="바로시작">게임 시작</button>
         <button class="단추 주" id="다시예" hidden>예 — 원본을 다시 고릅니다</button>
         <button class="단추 약" id="다시아니오" hidden>아니오</button>
@@ -374,14 +379,13 @@ function 설치됨화면() {
       $('바로시작').textContent = '그래도 시작 (리마스터 자료 일부 빠짐)'; $('바로시작').classList.replace('주', '약');
       $('다시CD').focus();
     }
-    /* 정본 441 — 배경음악은 원본 CD 이미지(.cue + .bin)의 오디오 트랙에서 나온다 · CD 없이(«설치된 폴더»로) 깔면 서버가 CD 를 못 찾아 음악이 꺼진다
-     *   (저절로 온 배경음진단_PC_20261123_222318 — 원본경로만 있고 CD경로 없음 · /CD/2·/CD/11 404) · 신고자에게 연락할 수 없다 ⇒ 첫 화면을 열 때마다 알리고 그 자리에서 연결
-     *   사장님 11-24 「처음한번이아니라 첫화면에서 해당 메세지 계속 띄우라고 했는데. cue없으면 해당 파일 다시 지정할 수 있도록」(휴대폰 첫 화면 정본 410 과 같게)
-     *   연결 = «원본 CD 로 다시 설치»와 같은 길(아래 CD연결 단추) — CD 이미지로 다시 깔면 설치 기록 CD폴더가 채워지고 음악이 나온다 */
-    if (!r.CD폴더 && r.창2) {
-      var 음악말 = '<div class="줄1">⚠ 배경음악이 나오지 않습니다</div>원본 <b>CD 이미지(.cue · .bin)</b>가 연결되지 않았습니다. 배경음악은 CD 의 음악 트랙에서 나옵니다. <b>«CD 이미지 연결…»</b>을 누르면 원본 CD 이미지를 고르는 화면으로 갑니다 — 창세기전 2 CD 의 <b>.cue</b> 파일(.bin 과 같은 폴더)을 골라 주세요. 세이브와 설정은 그대로 남습니다.';
-      $('경고칸').innerHTML = (b && b.어긋 > 0 ? $('경고칸').innerHTML + '<br><br>' : '') + 음악말;
-      $('경고칸').hidden = false; $('CD연결').hidden = !!(b && b.어긋 > 0);   /* 바탕 어긋남이면 «원본 CD 로 다시 설치» 단추가 같은 일 */
+    /* 정본 441 — cue 줄(휴대폰 정본 410 과 같은 꼴) · PC 첫 화면은 파일을 못 봐 «CD 없이 깔림(CD폴더 빔)»만 cue 없음으로 확정한다
+     *   그 밖에는 줄을 늘 두고 «안 나오면 연결» 로 — 실제 확인은 게임을 켤 때마다 게임.html 배경음살핌(/CD/2)이 하고 타이틀에서 이 단추를 가리킨다
+     *   (저절로 온 배경음진단_PC_20261123_222318 — CD경로 없음 · 사장님 11-24 「매 실행마다 체크해서 cue 못찾으면 안내 띄우라니까!」) */
+    if (r.창2) {
+      if (!r.CD폴더) $('cue말').innerHTML = '배경음악에 필요한 <b>.cue</b> 파일이 없습니다 — 창세기전 2 원본의 <b>GENESIS2.cue</b> 를 연결해 주세요.';
+      else $('cue말').innerHTML = '배경음악이 나오지 않으면 창세기전 2 원본의 <b>GENESIS2.cue</b> 를 연결해 주세요.';
+      $('cue줄').hidden = false; $('cue단추').hidden = false;
     }
   }).catch(function () {});
   $('바로시작').focus();
@@ -436,7 +440,7 @@ function 다시물음(켬) {
   var e = $('설치됨말');
   if (켬) { 알림전 = { 글: e.textContent, 숨김: e.hidden }; e.textContent = '원본을 다시 고릅니다. 세이브와 게임 설정은 그대로 남고, 설치해 둔 원본 사본과 그림 자료만 지웁니다. 다시 설치할까요?'; e.hidden = false; }
   else if (알림전) { e.textContent = 알림전.글; e.hidden = 알림전.숨김; 알림전 = null; }
-  ['바로시작', '다시설치', '패치줄', '새판받기', '다시CD', 'CD연결'].forEach(function (id) { if (켬) $(id).dataset.숨김전 = $(id).hidden ? '1' : ''; $(id).hidden = 켬 ? true : $(id).dataset.숨김전 === '1'; });
+  ['바로시작', '다시설치', '패치줄', '새판받기', '다시CD', 'cue줄'].forEach(function (id) { if (켬) $(id).dataset.숨김전 = $(id).hidden ? '1' : ''; $(id).hidden = 켬 ? true : $(id).dataset.숨김전 === '1'; });
   ['다시예', '다시아니오'].forEach(function (id) { $(id).hidden = !켬; });
   $(켬 ? '다시아니오' : '바로시작').focus();
 }
@@ -444,7 +448,7 @@ function 다시설치하기() {
   var 오류 = $('설치됨오류'); 오류.textContent = '지우는 중…';
   return 창구.다시설치().then(function () {
     오류.textContent = ''; 설치상태 = null;
-    ['경고칸', '다시CD', 'CD연결', '다시예', '다시아니오', '설치됨말'].forEach(function (id) { $(id).hidden = true; });
+    ['경고칸', '다시CD', 'cue줄', '다시예', '다시아니오', '설치됨말'].forEach(function (id) { $(id).hidden = true; });
     보이기('첫');
   }).catch(function (e) { 오류.textContent = 오류글(e); });
 }
@@ -453,9 +457,26 @@ $('바로시작').onclick = function () {
   창구.시작().catch(function (e) { 오류.textContent = 오류글(e); });
 };
 $('다시설치').onclick = function () { $('설치됨오류').textContent = ''; 다시물음(true); };
-/* 정본 441 — CD 이미지 연결 = «원본 CD 로 다시 설치»(설치 사본·그림 자료만 지우고 CD 이미지 고르는 첫 화면으로 · 세이브·설정은 그대로)
- *   «설치된 폴더»에 CD 만 덧붙이는 길(폴더로)은 쓰지 않는다 — 정본 372 에서 그 길을 없앴다(install_folder_cd_351·derive_diff_370 이 지킨다) */
-$('CD연결').onclick = 다시설치하기;
+/* 정본 441 — cue 연결: cue 만 골라 설치 기록의 CD폴더만 바꾼다 — 다시 설치하지 않는다(휴대폰 정본 410 «/upload?cue=1» 과 같은 일 · 글도 같게)
+ *   앱 본체(main.js · 패치로 못 바꿈)의 «폴더로» 창구에 «지금 설치 폴더(r.창2) 그대로» + 고른 cue → 기록 CD폴더 = cue 의 폴더 · 리마스터 그림 자료(파생)만 한 번 다시 만든다
+ *   ☆ 앱이 게임을 켤 때마다 기록 CD폴더를 서버 설정 CD경로로 넘기고, 서버는 그 폴더의 아무 이름 .cue 를 읽어 그 안 FILE 의 .bin 을 따라간다(server.js CD 찾기)
+ *   ☆ «설치된 폴더»로 새로 까는 길(첫 화면 폴더 고르기)은 여전히 없다 — 여기는 이미 깔린 r.창2 만 쓴다(install_folder_cd_351·derive_diff_370 이 지킨다) */
+$('cue단추').onclick = function () {
+  var 말 = $('cue말'), 단 = this, r = (설치상태 && 설치상태.기록) || {};
+  if (!r.창2) return;
+  창구.고르기('CD').then(function (p) {
+    if (!p) return null;
+    var 이름 = String(p).split(/[\\\/]/).pop();
+    if (!/\.cue$/i.test(p)) { 말.textContent = '고른 파일이 .cue 가 아닙니다 — GENESIS2.cue 를 골라 주세요.'; return null; }
+    단.disabled = true; $('바로시작').disabled = true; 말.textContent = '연결하는 중 — ' + 이름;
+    return 창구.폴더로({ 폴더: r.창2, cd: p, 창1: r.창1 || null }).then(function () {
+      단.disabled = false; 단.hidden = true; $('바로시작').disabled = false;
+      말.textContent = '✔ ' + 이름 + ' 를 연결했습니다 — «게임 시작» 을 누르면 배경음악이 나옵니다.';
+      $('바로시작').focus();
+      return 창구.상태().then(function (s2) { 설치상태 = s2; 버전줄(); });
+    });
+  }).catch(function (e) { 단.disabled = false; $('바로시작').disabled = false; 말.textContent = '연결하지 못했습니다 — 다시 골라 주세요. (' + 오류글(e) + ')'; });
+};
 $('다시아니오').onclick = function () { 다시물음(false); };
 $('다시예').onclick = 다시설치하기;
 $('다시CD').onclick = 다시설치하기;   /* 바탕 어긋남 — 확인 없이 곧바로(안내 글이 이미 물었다) */
