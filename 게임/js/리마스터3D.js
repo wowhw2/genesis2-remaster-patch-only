@@ -839,7 +839,29 @@
    *   단차마다 끊어져서 표현되는데, 경사면에 맞게 눕혀서 잘 표시되어야해. 그리고 지금은 하이라이트 표시 및 커서 박스 선택시 꽤 느려지는 문제가 있어서 이부분도 해결하면 좋겠어」)
    *   그림 = 실행기 _범위리맵바닥 (바닥을 원본 리맵 표로 칠한 그림 · 스타일 규칙과 같은 것) · 칸 = markLayer 의 리맵 표식 자리
    *   그린 동안 DOM 리맵 표식은 감춘다(g2-3d표식) — 리맵 그림이 없으면(반투명 표식) 예전대로 DOM 을 띄운다 */
+  /* ★ 정본 400 — 미리 만들어 둔 범위 그림(R._범위리맵그림)을 범위가 떠 있지 않을 때 한가한 틈에 그래픽 카드에 미리 올린다
+   *   ☠ 그림은 미리 만들어 두었는데 올리기(texImage2D)는 링을 «여는 순간» 했다 — 휴대폰 기록(11-23 · 갤럭시 Z 폴드6 · 1-7) 링 열 때 3D 표식 54ms ·
+   *     측정 크롬 휴대폰 흉내(CPU×6 · xBRZ2n · 1-7 3D) 그 장 350ms 중 올리기 792ms(프로파일 합)
+   *   한 칸으로 올린 뒤 곧바로 빈 목록으로 지워 그 사이 그려지지 않는다(같은 차례) · 3D 모듈은 그대로 · 끄기 window.__범위그림미리끔 */
+  function 범위그림미리올리기(R, s) {
+    var 미리 = R._범위리맵그림;
+    if (root.__범위그림미리끔 || !미리 || s.미리올린 === 미리 || s.미리올림예약 || !(s.장면 && s.장면.표식그리기)) return;
+    if (!(미리.complete && 미리.naturalWidth) || !R._floorW || !R._floorH) return;
+    s.미리올림예약 = true;
+    var 돌 = function () {
+      s.미리올림예약 = false;
+      if (R._리마스터3D !== s || !s.준비됨 || R._범위리맵그림 !== 미리 || s.미리올린 === 미리) return;
+      if (R.markLayer && R.markLayer.children.length) return;   /* 범위가 떠 있으면 실제 길이 올린다 */
+      try {
+        s.장면.표식그리기(['0,0'], 미리, R._floorW, R._floorH);
+        s.장면.표식그리기([], 미리, R._floorW, R._floorH);
+        s.미리올린 = 미리;
+      } catch (e) { s.미리올린 = 미리; }
+    };
+    if (typeof root.requestIdleCallback === 'function') root.requestIdleCallback(돌, { timeout: 3000 }); else setTimeout(돌, 500);
+  }
   function 표식3D(R, s) {
+    범위그림미리올리기(R, s);
     var 켬 = false, 기다림 = false;   /* 기다림 — 첫 범위 리맵판을 읽는 중: 그동안도 평면 표식을 감춘다(링을 열 때 첫 화면에 평면 칸이 한 번 비쳤다) */
     try {
       var url = R._범위리맵URL, L = R.markLayer, 칸 = [];

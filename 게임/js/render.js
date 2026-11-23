@@ -8763,7 +8763,16 @@ Renderer.prototype.애니그룹칸 = function (그룹, x, y, 타일, url) {
   this.tileEls[k] = e;
   return e;
 };
+/** 3D 에서 타일층·배경벽이 숨어 있나 (리마스터3D 가 host 에 g2-3d맵 · 타일층에 g2-tilelayer3d 를 건다 — 그 규칙으로 display:none) */
+Renderer.prototype._타일층숨음 = function () {
+  return !!(this.host && this.host.classList && this.host.classList.contains('g2-3d맵') &&
+            this.tileLayer && this.tileLayer.classList && this.tileLayer.classList.contains('g2-tilelayer3d'));
+};
 Renderer.prototype._애니타일다시칠하기 = function () {
+  /* ★ 정본 400 — 3D 에서는 타일층이 숨어 안 보인다 — 칠하지 않고 표시만 해 두었다가 다시 보이면(_apply본) 한 번 칠한다
+   *   ☠ 날씨 전환 걸음마다 물·용암 타일을 xBRZ 로 키우고 주소를 다시 만들었다(휴대폰 흉내 2-4A 3D 걸음당 10ms · 사장님 11-23 「날씨 전환 남은 거 줄여」) · 끄기 window.__숨은애니판도그림 */
+  if (!root.__숨은애니판도그림 && this._타일층숨음()) { this._애니타일밀림 = true; return this; }
+  this._애니타일밀림 = false;
   var 칸들 = this.tileEls || {}, self = this;
   /* SCE 가 layerA 를 바꾼 직후 팔레트가 먼저 오면 옛 칸 목록은 폐기돼 있다.
    * 현재 MAP 의 기존 Fx 첫 프레임을 한 번 계산해 새 칸으로 다시 칠한다. */
@@ -13273,6 +13282,7 @@ Renderer.prototype.apply = function () {
   return 결과;
 };
 Renderer.prototype._apply본 = function () {
+  if (this._애니타일밀림 && !this._타일층숨음()) { try { this._애니타일다시칠하기(); } catch (e애) { this._애니타일밀림 = false; } }   /* 정본 400 — 3D 동안 미룬 애니 타일 칠(3D 를 끈 첫 갱신에) */
   if (this._칠밀림 && this._칠밀림.length) { try { this._밀린칠하기(); } catch (e밀) {} }   /* 스케일러 팔레트 — 화면에 들어온 조각을 칠한다 */
   /* ★ 맵 아이템(보물)도 함께 갱신한다 — 먹으면 상자가 열린 그림으로 바뀐다
    *   (원본 0x1862F 가 `sete al` 로 「이미 먹었나」를 인덱스에 더한다). */

@@ -54,9 +54,35 @@
      *    `window.__G2자산_날씨적용()` 이 **다시 판다.** 파일은 다시 안 읽는다.
      * ══════════════════════════════════════════════════════════════════ */
     var 굽기목록 = [];
-    function 굽기등록(fn) {
-      굽기목록.push(fn);
-      try { fn(A.palette() || pal); } catch (e굽) { console.warn('자산 굽기 실패:', e굽 && e굽.message); }
+    /* ★ 정본 400 — 프레임들을 주면 «그 그림이 실제로 쓰는 색 칸»의 팔레트 값이 지난번과 같을 때(+ 같은 렌더러 · 같은 스케일러) 다시 굽지 않는다
+     *   굽는 결과는 그 색 칸 값에만 달려 있다(frameToCanvas/frameToImageData 가 idx 칸의 팔레트만 읽는다) — 결과가 정확히 같다
+     *   ☠ 전투 중 날씨가 바뀔 때마다 커서 12장·턴 표시 8장·선택 상자 모서리 4장을 다시 만들고 PNG 로 바꿨다 — 휴대폰 흉내(CPU×6) 약 50ms 가
+     *     첫 팔레트 걸음과 한 장에 겹쳐 200~250ms (사장님 11-23 「날씨 전환 남은 거 줄여」) · 렌더러가 바뀌면(새 전투) 예전처럼 굽는다 · 끄기 window.__자산색같아도굽기 */
+    function 쓰는색(프레임들) {
+      var 있음 = {}, 목 = [];
+      (프레임들 || []).forEach(function (fr) {
+        var idx = fr && fr.idx; if (!idx) return;
+        for (var i = 0; i < idx.length; i++) { var c = idx[i]; if (c >= 0 && !있음[c]) { 있음[c] = 1; 목.push(c); } }
+      });
+      return 목.sort(function (a, b) { return a - b; });
+    }
+    function 굽기등록(fn, 프레임들) {
+      if (Array.isArray(fn)) { var 앞 = fn; fn = 프레임들; 프레임들 = 앞; }   /* 굽기등록(프레임들, fn) 꼴도 받는다 */
+      var 색들 = 프레임들 ? 쓰는색(프레임들) : null, 열쇠 = null, 구운렌더러 = null;
+      var 감싼 = function (p, 날씨) {
+        var k = null;
+        if (색들) {
+          var 값 = [];
+          for (var i = 0; i < 색들.length; i++) { var c = 색들[i]; 값.push(p[c * 3], p[c * 3 + 1], p[c * 3 + 2]); }
+          k = 값.join(',') + '|' + (window.G2Scaler && G2Scaler.cur ? G2Scaler.cur() : '');
+        }
+        var 렌 = 현재렌더러();
+        if (k && 날씨 && !window.__자산색같아도굽기 && k === 열쇠 && 렌 === 구운렌더러) return;
+        fn(p, 날씨);
+        열쇠 = k; 구운렌더러 = 렌;
+      };
+      굽기목록.push(감싼);
+      try { 감싼(A.palette() || pal); } catch (e굽) { console.warn('자산 굽기 실패:', e굽 && e굽.message); }
     }
     /** 전투에 들어갈 때마다 부른다 — 날씨가 그대로면 색도 그대로다. */
     window.__G2자산_날씨적용 = function () {
@@ -132,7 +158,7 @@
        *   ⇒ 아이콘은 항상 만들어 전역(`__G2_ETC_ICONS`)에 두고, R 이 있으면 바로 넣는다.
        *     `Renderer` 생성자가 그 전역에서 스스로 되찾으므로 체인·재구성에도 살아남는다. */
       var ei = G2Native.decodeNC2(await grab('ETC.ICO'));
-      if (ei) 굽기등록(function (pal) {
+      if (ei) 굽기등록(ei.frames.slice(0, 8), function (pal) {
         var 마커들 = [0, 1, 2, 3, 4, 5, 6, 7].map(function (n) {
           var fr = ei.frames[n]; if (!fr) return null;
           var c = G2Native.frameToCanvas(fr, pal);
@@ -162,7 +188,7 @@
         } catch (e6) { console.warn('링 아이콘 직독 실패:', RF[mk], e6 && e6.message); }
       }
       /* ★ 날씨가 바뀌면 **다시 굽는다** — 파일은 위에서 한 번만 읽었다 (2026-09-10) */
-      굽기등록(function (pal, 날씨) {
+      굽기등록([].concat.apply([], Object.keys(링프레임).map(function (k) { return 링프레임[k]; })), function (pal, 날씨) {
         var done = [];
         Object.keys(링프레임).forEach(function (mk2) {
           /* 정본 400 — 날씨가 바뀔 때는 닫힌 링 아이콘을 한가할 때 굽는다(링을 열면 그 자리에서 다 굽는다 · ring.js 아이콘미루기) */
@@ -178,7 +204,7 @@
      * frameToImageData 로 8×7 캔버스에 그려 data-URL 로 R.SELBOX.corner 교체. */
     try {
       var mc = G2Native.decodeNC2(await grab('MAIN.CUR'));
-      if (mc) 굽기등록(function (pal) {
+      if (mc) 굽기등록(mc.frames.slice(4, 8), function (pal) {
         var 렌더러 = 현재렌더러();
         if (!(렌더러 && 렌더러.선택상자모서리설정)) return;
         var urls = [4, 5, 6, 7].map(function (fi) {
@@ -224,7 +250,7 @@
        *   ⇒ 항상 전역(`__G2_CURSORS`)에 두고, 창구가 있으면 바로 넣는다.
        *     `Renderer` 생성자와 `battle_main` 이 그 전역에서 스스로 되찾는다. */
       /* ★ 날씨가 바뀌면 **다시 굽는다** — 파일은 위에서 한 번만 읽었다 (2026-09-10) */
-      굽기등록(function (pal) {
+      굽기등록((mcur ? mcur.frames.slice(0, 4) : []).concat(vcur ? vcur.frames.slice(0, 8) : []), function (pal) {
         var mu = mcur ? curUrls(mcur, [0, 1, 2, 3], pal) : null;
         var vu = vcur ? curUrls(vcur, [0, 1, 2, 3, 4, 5, 6, 7], pal) : null;
         if (mu && vu && mu.every(Boolean) && vu.every(Boolean)) {
@@ -256,7 +282,7 @@
     /* ── 집중 이펙트 — `CHR_EFFC.SYB` 0x21~0x23 직독 (0x126FE · 할일 19-d) ── */
     try {
       var ce = G2Native.decodeSYB(await grab('CHR_EFFC.SYB'));
-      if (ce) 굽기등록(function (pal) {
+      if (ce) 굽기등록(ce.frames, function (pal) {
         var got = [0x21, 0x22, 0x23].map(function (n) {
           var fr = ce.frames[n]; if (!fr) return null;
           return { url: G2Native.frameToCanvas(fr, pal).toDataURL(),
