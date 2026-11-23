@@ -211,7 +211,10 @@ function 텍스처올리기(판) {
   var lw = 판.lw, lh = 판.lh, fr = 판.fr, 번호 = 번호만들기(fr);
   판.바이트 = 판바이트(판);
   예산맞추기(판.바이트);
-  try { gl.getError(); } catch (e0) { }   /* 앞의 오류를 비운다 */
+  /* 정본 400 — 앞의 오류 비우기(getError)는 하지 않는다: getError 는 그래픽 카드가 앞서 받은 일을 다 끝낼 때까지 기다리게 해(안드로이드에서 특히) 판마다 두 번 멈췄다
+   *   (갤럭시 S24+ 기록 2-6 날씨 전환 한 걸음 638ms · 측정 크롬 휴대폰 흉내 첫 걸음 getError 494ms) · 묵은 오류가 있으면 아래 검사가 이 판을 CPU 길로 돌릴 뿐 — CPU 길도 같은 그림
+   *   끄기 window.__팔레트GPU앞오류비움 */
+  if (root.__팔레트GPU앞오류비움) { try { gl.getError(); } catch (e0) { } }
   판.세대 = 세대;
   판.tBase = 텍스처(); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, 판.바탕);
   판.tIdx = 텍스처(); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, fr.w, fr.h, 0, gl.RG, gl.UNSIGNED_BYTE, 번호);
