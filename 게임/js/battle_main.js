@@ -5785,13 +5785,17 @@
         }
         if (R.updateUnit) R.updateUnit(u);
         if (R.snapUnit) R.snapUnit(u);
-        if (R.apply) R.apply();
+        /* 정본 400 — 연출 줄기(흔들림·피격 숫자·자해 흔들림·사망 회전)가 장마다 하던 화면 반영을 «이 차례 끝 한 번»으로 모은다.
+         *   같은 장에 줄기 여럿이 각자 R.apply 를 불러 한 장에 최대 7번 화면을 통째로 다시 놓았다 — 그려지는 것은 마지막 한 번뿐
+         *   (측정 크롬 1-7 기울기 26 · 휴대폰 흉내 CPU×6 · 필살기 큰 장 84ms 중 apply 7번 · Fold7 기록 SPECIAL_ANIMATING «표시» 282ms).
+         *   유닛 자리는 updateUnit 이 이미 정하고(_빌보드놓기) snapUnit 도 그 값만 쓴다 ⇒ 반영을 미뤄도 그리기 전(마이크로태스크)이라 보이는 것은 같다 · 끄기 window.__apply몰기끔 */
+        if (R.apply예약) R.apply예약(); else if (R.apply) R.apply();   /* 정본 400 — 화면 반영은 이 차례 끝 한 번 (끄기 __apply몰기끔) */
       }
     }).then(function () {
       /* 0x30292에서 모델은 즉시 복귀한다. 화면 전용 presentation은 0x302A5까지 마지막 숫자 장을 유지한다. */
       if (u.alive) {
         if (화면보류) R.setUnitPresentation(u, { motion: u.motion, dir: u.dir, ox: u.ox, oy: u.oy });
-        poseRest(u); R.updateUnit(u); R.apply();
+        poseRest(u); R.updateUnit(u); if (R.apply예약) R.apply예약(); else if (R.apply) R.apply();   /* 정본 400 — 화면 반영은 이 차례 끝 한 번 (끄기 __apply몰기끔) */
       }
       return 연출대기(HPCOST_POST_TICKS * TICK).then(function () {   // 0x302A5
         if (화면보류) { R.clearUnitPresentation([u]); if (R.apply) R.apply(); }
@@ -6833,7 +6837,7 @@
          *     `controller._이벤트끝날때까지()` 가 이미 막고 있다. */
         if (R.muteHud) R.muteHud(false);                             // 0x44DEC(1) · 0x1F3E4
         R.showUnitValues(체력표시깃발());
-        R.apply();
+        if (R.apply예약) R.apply예약(); else if (R.apply) R.apply();   /* 정본 400 — 화면 반영은 이 차례 끝 한 번 (끄기 __apply몰기끔) */
         return v;
       }, function (err) {
         무기스윙지움();
@@ -7010,7 +7014,7 @@
           else R.hitShake(r.unit, a.dir | 0, { from: 1 });
           R.updateUnit(r.unit);
         });
-        R.apply();
+        if (R.apply예약) R.apply예약(); else if (R.apply) R.apply();   /* 정본 400 — 화면 반영은 이 차례 끝 한 번 (끄기 __apply몰기끔) */
       }
 
       /* ══════════ 루프 **뒤** — 속성 이펙트 + 숫자 팝업 (`0x1EB0A` ~ `0x1EBE6`) ══
@@ -7103,7 +7107,7 @@
           if (!화면지연) return;
           화면지연 = false;
           try { R.clearUnitPresentation(표시대상); } catch (e표시지움) {}
-          try { if (R.apply) R.apply(); } catch (e표시복구) {}
+          try { if (R.apply예약) R.apply예약(); else if (R.apply) R.apply();   /* 정본 400 — 화면 반영은 이 차례 끝 한 번 (끄기 __apply몰기끔) */ } catch (e표시복구) {}
         }
         function 수동숫자닫기() {
           if (!수동숫자들) return;
@@ -7166,7 +7170,7 @@
                   }
                    R.updateUnit(u); if (R.snapUnit) R.snapUnit(u);
                  });
-                 if (shakeApplied && R.apply) R.apply();
+                 if (shakeApplied) if (R.apply예약) R.apply예약(); else if (R.apply) R.apply();   /* 정본 400 — 화면 반영은 이 차례 끝 한 번 (끄기 __apply몰기끔) */
                }
             }
             var 걸음 = k + 1;
@@ -7177,7 +7181,7 @@
             /* 각 장의 표시 overlay는 정수 논리 픽셀이다. apply로 위치를 갱신한 직후
              * snap해 보간 잔차를 제거한다 (0x287DD가 읽는 화면 장과 모델 오프셋은 분리). */
             if (화면지연 && R.apply) {
-              R.apply();
+              if (R.apply예약) R.apply예약(); else if (R.apply) R.apply();   /* 정본 400 — 화면 반영은 이 차례 끝 한 번 (끄기 __apply몰기끔) */
               if (R.snapUnit) 표시대상.forEach(function (u) { R.snapUnit(u); });
             }
           } });
@@ -7242,7 +7246,7 @@
           poseRest(r.unit);                      // 0x12124 — 0x28862 는 전원에게
           R.updateUnit(r.unit);
         });
-        R.apply();
+        if (R.apply예약) R.apply예약(); else if (R.apply) R.apply();   /* 정본 400 — 화면 반영은 이 차례 끝 한 번 (끄기 __apply몰기끔) */
       }
     },
     /* ── 반격 `0x1EF9A` — **평타와 같은 연출 본체를 그대로 돈다** ──────────────
@@ -7558,7 +7562,7 @@
             u.dir = ((u.dir | 0) + 1) & 3;
             /* `_dying` 이 켜져 있어 `updateUnit` 이 안 숨긴다 */
             deathRenderer.updateUnit(u);
-            deathRenderer.apply();
+            if (deathRenderer.apply예약) deathRenderer.apply예약(); else if (deathRenderer.apply) deathRenderer.apply();   /* 정본 400 — 화면 반영은 이 차례 끝 한 번 (끄기 __apply몰기끔) */
           }
         }).then(function () {
           교체검사();
@@ -8288,7 +8292,7 @@
       function 효과복원() {
         if (p.actor) { poseRest(p.actor); p.actor.attackPose = false; R.updateUnit(p.actor); }
         if (R.muteHud) R.muteHud(false);
-        R.showUnitValues(체력표시깃발()); R.apply();
+        R.showUnitValues(체력표시깃발()); if (R.apply예약) R.apply예약(); else if (R.apply) R.apply();   /* 정본 400 — 화면 반영은 이 차례 끝 한 번 (끄기 __apply몰기끔) */
       }
       /* ★ 연타 공통 0x2CC3A(검 연 0 · 창 연 8 · 권 연 19) — 잔상 연출 뒤 평타를 붙이지 않는다 (2026-09-24) */
       var 연타 = !!(rep0 && rep0.kind === 'special' && (slot === 0 || slot === 8 || slot === 19));

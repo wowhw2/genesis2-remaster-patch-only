@@ -853,7 +853,8 @@ function 돌무늬나눠짓기(srcs, OW, OH, 씨앗, 조각ms) {
      *     (성능기록_휴대폰_20261123_121406 · AYN Odin 3 · 긴 장 기록: 막힘 572ms · 5ms 넘는 스크립트 없음)
      *   ⇒ 미리 짓기: 한가할 때를 최대 0.1초만 기다리고, 한가할 때는 남은 틈만큼 · 급함: 한 장(rAF)에 한 조각 — 몰아 짓지 않는다(결과는 같다) */
     var 다음 = function (g) {
-      if (!_돌무늬급함 && typeof requestIdleCallback === 'function') { requestIdleCallback(function (기한) { g(기한); }, { timeout: 100 }); return; }
+      /* 전투 로딩 화면이 떠 있으면 한가할 때를 최대 1초까지 기다린다 — 0.1초면 로딩(xBRZ 굽기)과 CPU 를 나눠 써 로딩이 늘었다(측정 크롬 CPU×4 1-1 열기 프로파일: 로딩 중 돌 무늬 3.1초 · 11-23) */
+      if (!_돌무늬급함 && typeof requestIdleCallback === 'function') { var 로딩중 = !!(root.G2전투로딩 && root.G2전투로딩.열려있나 && root.G2전투로딩.열려있나()); requestIdleCallback(function (기한) { g(기한); }, { timeout: 로딩중 ? 1000 : 100 }); return; }
       if (typeof requestAnimationFrame === 'function') { requestAnimationFrame(function () { g(); }); return; }
       바로(g);
     };

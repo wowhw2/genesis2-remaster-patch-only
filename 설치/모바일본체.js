@@ -207,6 +207,71 @@ function 서버기록붙잡기() {
     };
   }
 }
+/* ★ 정본 362·410 — 배경음 트랙(/CD/n)은 본체가 직접 내준다 (패치로 바뀌는 쪽에서)
+ *   배경음진단_휴대폰_20261123_170350(아이폰 라이브 컨테이너 · R0.1.88): 원본받음에 Genesis2.img·고친_Genesis2.cue 가 있고 본체의 cue 풀이는 «있음 · 트랙 19 · 음악 18» 인데
+ *   같은 순간 게임 서버는 켤 때 «CD 이미지 못 찾음» → /CD/2·/CD/11 404 (정본 362 아이패드 미니6 와 같은 꼴 · PC 에서 같은 폴더로는 서버가 찾았다)
+ *   서버(server.js cdAudio)는 패치로 못 바꾸는 엔진이고 한 번 «없음»이면 앱을 다시 켤 때까지 그대로다(나중에 cue 를 연결해도)
+ *   ⇒ 서버를 띄우기 전에 http.createServer 를 감싸 /CD/숫자 만 본체가 대답한다 · 못 찾으면 서버에 넘긴다(예전과 같음)
+ *   서버 sendCdTrack·wavHeader 와 같은 꼴(44바이트 PCM WAV 머리 · Range) */
+const CD_칸 = 2352, CD_빈도 = 44100;
+let 본체CD기억 = null;
+function 본체CD표() {
+  const r = 기록읽기();
+  const 폴더들 = [];
+  if (r && r.CD) { try { const st = fs.statSync(r.CD); 폴더들.push(st.isFile() ? path.dirname(r.CD) : r.CD); } catch (e) { } }
+  if (r && r.CD폴더) 폴더들.push(r.CD폴더);
+  폴더들.push(올린폴더);
+  let 큐읽기 = null; try { 큐읽기 = require(path.join(게임폴더, '설치엔진.js')).큐읽기; } catch (e) { }
+  for (const d of [...new Set(폴더들)]) {
+    let 이름들 = []; try { 이름들 = fs.readdirSync(d); } catch (e) { continue; }
+    const 큐들 = 이름들.filter(n => /\.cue$/i.test(n)).sort((a, b) => (/^고친_/.test(b) ? 1 : 0) - (/^고친_/.test(a) ? 1 : 0));
+    for (const n of 큐들) {
+      const cue = path.join(d, n);
+      try {
+        const c = 큐읽기 ? 큐읽기(cue) : null; if (!c || !c.bin || /\.iso$/i.test(c.bin)) continue;
+        const 크기 = fs.statSync(c.bin).size, 열쇠 = cue + '|' + fs.statSync(cue).mtimeMs + '|' + c.bin + '|' + 크기;
+        if (본체CD기억 && 본체CD기억.열쇠 === 열쇠) return 본체CD기억;
+        const 트랙 = {}; let 지금 = null;
+        for (const 줄 of fs.readFileSync(cue, 'latin1').split(/\r?\n/)) {
+          let m = 줄.match(/TRACK\s+(\d+)\s+(\S+)/i); if (m) { 지금 = { no: +m[1], type: m[2].toUpperCase() }; continue; }
+          m = 줄.match(/INDEX\s+01\s+(\d+):(\d+):(\d+)/i);
+          if (m && 지금) { 트랙[지금.no] = { type: 지금.type, start: ((+m[1] * 60 + +m[2]) * 75 + +m[3]) * CD_칸 }; 지금 = null; }
+        }
+        const 번호 = Object.keys(트랙).map(Number).sort((a, b) => a - b); if (!번호.length) continue;
+        번호.forEach((k, i) => { 트랙[k].end = (i + 1 < 번호.length) ? 트랙[번호[i + 1]].start : 크기; });
+        본체CD기억 = { 열쇠, bin: c.bin, 트랙 };
+        console.log('[본체] 배경음 트랙 — ' + path.basename(c.bin) + ' · 음악 ' + 번호.filter(k => 트랙[k].type === 'AUDIO').length + '개 (' + n + ')');
+        return 본체CD기억;
+      } catch (e) { continue; }
+    }
+  }
+  return null;
+}
+function 본체CD내주기(req, res) {
+  let 주소 = String(req.url || '').split('?')[0]; try { 주소 = decodeURIComponent(주소); } catch (e) { }
+  const m = /^\/CD\/(\d+)$/.exec(주소); if (!m) return false;
+  let cd = null; try { cd = 본체CD표(); } catch (e) { cd = null; }
+  const t = cd && cd.트랙[+m[1]];
+  if (!t || t.type !== 'AUDIO') return false;              /* 못 찾으면 서버에 넘긴다 */
+  const 전체 = t.end - t.start, 끝까지 = 44 + 전체;
+  let s = 0, e = 끝까지 - 1;
+  const rg = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+  if (rg) { if (rg[1]) s = Math.min(+rg[1], 끝까지 - 1); if (rg[2]) e = Math.min(+rg[2], 끝까지 - 1); }
+  const 머리 = Buffer.alloc(44);
+  머리.write('RIFF', 0); 머리.writeUInt32LE(36 + 전체, 4); 머리.write('WAVE', 8); 머리.write('fmt ', 12); 머리.writeUInt32LE(16, 16);
+  머리.writeUInt16LE(1, 20); 머리.writeUInt16LE(2, 22); 머리.writeUInt32LE(CD_빈도, 24); 머리.writeUInt32LE(CD_빈도 * 4, 28);
+  머리.writeUInt16LE(4, 32); 머리.writeUInt16LE(16, 34); 머리.write('data', 36); 머리.writeUInt32LE(전체, 40);
+  const 답머리 = { 'Content-Type': 'audio/wav', 'Content-Length': String(e - s + 1), 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' };
+  if (rg) 답머리['Content-Range'] = 'bytes ' + s + '-' + e + '/' + 끝까지;
+  res.writeHead(rg ? 206 : 200, 답머리);
+  if (s < 44) res.write(머리.subarray(s, Math.min(44, e + 1)));
+  const 부터 = Math.max(0, s - 44), 까지 = Math.max(-1, e - 44);
+  if (까지 < 부터) { res.end(); return true; }
+  const rs = fs.createReadStream(cd.bin, { start: t.start + 부터, end: t.start + 까지 });
+  rs.on('error', () => { try { res.end(); } catch (x) { } });
+  rs.pipe(res);
+  return true;
+}
 function 게임띄우기(r) {
   /* GAME.CFG — 원본 CD 에 없고 원본 설치 프로그램이 만든다 → 없으면 출하 기본값 10B (앱 main.js 와 같음) */
   try { if (!fs.readdirSync(r.창2).some(f => f.toUpperCase() === 'GAME.CFG'))
@@ -221,7 +286,14 @@ function 게임띄우기(r) {
   fs.mkdirSync(path.join(데이터, '세이브'), { recursive: true });
   fs.mkdirSync(path.join(데이터, '상태', 'CHAPDATA'), { recursive: true });
   서버기록붙잡기();
-  require(path.join(게임폴더, 'server.js'));
+  /* 정본 362·410 — 게임 서버가 만드는 http 서버에서 /CD/숫자 만 본체가 먼저 받는다 (위 본체CD내주기) */
+  const 원만들기 = http.createServer;
+  http.createServer = function (a, b) {
+    const 처리 = typeof a === 'function' ? a : b;
+    const 감싼 = function (req, res) { try { if (본체CD내주기(req, res)) return; } catch (e) { } return 처리.apply(this, arguments); };
+    return typeof a === 'function' ? 원만들기.call(http, 감싼) : 원만들기.call(http, a, 감싼);
+  };
+  try { require(path.join(게임폴더, 'server.js')); } finally { http.createServer = 원만들기; }
   게임켬 = true;
 }
 const 게임주소 = () => 'http://127.0.0.1:' + 게임포트 + '/' + encodeURIComponent('게임') + '/' + encodeURIComponent('게임') + '.html?devtools=0&' + encodeURIComponent('모바일') + '=1';
