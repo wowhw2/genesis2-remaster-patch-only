@@ -290,6 +290,64 @@
     })();
     return true;
   }
+  /* ★ 정본 428 — 전투에서 유닛이 «하나도 안 그려진» 채로 있으면 앱이 스스로 알아채 고쳐 보고, 그래도 안 되면 진단을 저절로 보낸다
+   *   신고(R0.1.85 PC · 3-5A · 맵·HUD 는 보이는데 유닛 몸만 없음)는 재현이 안 됐고 신고자에게 되물을 수 없다
+   *   (사장님 11-23 「내가 어떻게 개별적으로 전달하냐고!」) ⇒ 사람에게 «다시 신고해 달라»고 하지 않는다
+   *   전투 대기(FRAME_IDLE) · 살아 있는 유닛 둘 이상 · 3초마다: 상자가 없거나 상자 안 캔버스에 칠한 점이 하나도 없으면 «안 보임»
+   *   9초 이어지면 유닛 상자를 다시 짓게 한다(updateUnit — 층이 비면 다시 지음) · 18초 이어지면 고치기 전후 상태를 담아 하루 한 번 «유닛안보임진단_…zip» */
+  var 유닛감시 = { 연속: 0, 고친앞: null, 보냄: false };
+  function 점있나(c) { try { if (!c.width || !c.height) return false; var d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (var i = 3; i < d.length; i += 4) if (d[i]) return true; } catch (e) { return true; } return false; }   /* 못 읽으면 «있음»으로 — 잘못 알리지 않게 */
+  function 유닛안보이나() {
+    var R = root.R, B = root.battle, C = root.ctrl;
+    if (!R || !R.unitEls || !B || !B.units || !C || C.mode !== 'FRAME_IDLE') return null;
+    try { var 셸 = root.__셸 && root.__셸.수명주기 ? root.__셸.수명주기().화면 : ''; if (셸 && 셸 !== 'BATTLE') return null; } catch (e) { }
+    var 살아 = B.units.filter(function (u) { return u && u.alive !== false && !u.감춤 && u.hp > 0; });
+    if (살아.length < 2) return null;
+    var 상자 = 0, 칠함 = 0;
+    for (var i = 0; i < 살아.length && 상자 < 6; i++) {
+      var e = R.unitEls[살아[i].id]; if (!e || e.style.display === 'none') continue;
+      상자++;
+      var 캔 = e.querySelectorAll('canvas'); for (var k = 0; k < 캔.length; k++) if (점있나(캔[k])) { 칠함++; break; }
+      if (!캔.length && e.style.backgroundImage) 칠함++;
+      if (칠함) return false;   /* 하나라도 칠했으면 그만 읽는다 — 정상일 때는 유닛 하나만 읽는다 */
+    }
+    return 칠함 === 0;   /* 상자가 하나도 없어도 «안 보임» */
+  }
+  function 유닛다시짓기() {
+    var R = root.R, B = root.battle;
+    B.units.forEach(function (u) { var e = u && R.unitEls[u.id]; if (e) e._layerSig = null; try { R.updateUnit(u); } catch (e2) { } });
+    try { if (R.apply) R.apply(); } catch (e3) { }
+  }
+  function 유닛진단보내기(까닭) {
+    if (유닛감시.보냄 || !(모바일 || root.G2앱)) return false;
+    try { if (navigator.webdriver) return false; } catch (e웹) { }
+    var 오늘 = new Date().toISOString().slice(0, 10);
+    try { if (localStorage.getItem('g2.유닛진단날') === 오늘) return false; localStorage.setItem('g2.유닛진단날', 오늘); } catch (e날) { }
+    유닛감시.보냄 = true;
+    try {
+      var 정보 = 모으기('유닛 안 보임 진단(저절로) — ' + (까닭 || ''));
+      정보.고치기전유닛그림 = 유닛감시.고친앞;
+      var 엔 = new TextEncoder(), 때 = new Date(), 붙 = function (n) { return (n < 10 ? '0' : '') + n; };
+      var 이름 = '유닛안보임진단_' + (모바일 ? '휴대폰' : 'PC') + '_' + 때.getFullYear() + 붙(때.getMonth() + 1) + 붙(때.getDate()) + '_' + 붙(때.getHours()) + 붙(때.getMinutes()) + 붙(때.getSeconds()) + '.zip';
+      var zip = zip만들기([{ 이름: '정보.json', 바이트: 엔.encode(JSON.stringify(정보, null, 1)) }, { 이름: '콘솔끝.txt', 바이트: 엔.encode(기록.slice(-150).join('\n')) }]);
+      fetch(휴대폰신고주소, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ 이름: 이름, 설명: String(정보.설명).slice(0, 1000), zip: 바64(zip) }) }).catch(function () { });
+    } catch (e보) { }
+    return true;
+  }
+  if (typeof setInterval === 'function' && typeof document !== 'undefined') setInterval(function () {
+    try {
+      if (document.hidden) return;
+      var 안 = 유닛안보이나();
+      if (안 !== true) { 유닛감시.연속 = 0; return; }
+      유닛감시.연속++;
+      if (유닛감시.연속 === 3) {
+        try { 유닛감시.고친앞 = 진단().유닛그림; } catch (e진) { }
+        console.warn('[유닛감시] 전투 유닛이 9초째 하나도 안 그려졌다 — 유닛 상자를 다시 짓는다');
+        유닛다시짓기();
+      }
+      if (유닛감시.연속 === 6) { console.warn('[유닛감시] 다시 지어도 안 보인다 — 진단을 보낸다'); 유닛진단보내기('다시 지어도 18초째 안 보임'); }
+    } catch (e) { }
+  }, 3000);
   function 열기() {
     if (창) return;
     try { 배경음살피기(); } catch (e배) { 배경음점검 = { 상태: '못 잼 ' + (e배 && e배.message) }; }
@@ -374,7 +432,7 @@
     if (e.key === 'F8') { e.preventDefault(); e.stopPropagation(); if (창) 닫기(); else 열기(); }
   }, true);
 
-  var API = { 이용안내글: 이용안내글, 배경음진단보내기: 배경음진단보내기, 열기: 열기, 닫기: 닫기, 모으기: 모으기, 기록: function () { return 기록.slice(); }, 판: 판, _zip: zip만들기, _바64: 바64, _만들기: function (보내기) { return 만들기(보내기); } };   /* _ 셋은 시험용 */
+  var API = { 이용안내글: 이용안내글, 배경음진단보내기: 배경음진단보내기, 열기: 열기, 닫기: 닫기, 모으기: 모으기, 기록: function () { return 기록.slice(); }, 판: 판, _zip: zip만들기, _바64: 바64, _만들기: function (보내기) { return 만들기(보내기); }, _유닛안보이나: 유닛안보이나, _유닛다시짓기: 유닛다시짓기, _유닛감시: 유닛감시 };   /* _ 붙은 것은 시험용 */
   root.G2버그신고 = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);
