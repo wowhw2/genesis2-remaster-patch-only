@@ -13321,11 +13321,28 @@ Renderer.prototype.apply = function () {
   if(this._map3dGpuScene)this._map3dGpuScene.draw();
   return 결과;
 };
+/* 정본 400 — 3D 가 켜졌을 때 CSS 로 감춰지는 판인가 (리마스터3D 규칙넣기 의 클래스 목록과 같다 · 그 판이나 조상에 있으면) · 판마다 기억(부모가 바뀌면 다시) */
+var 사물3D숨김클래스 = ['g2-floorlayer', 'g2-tilelayer3d', 'g2-flat-object-layer', 'g2-backdrop', 'g2-backdrop-anim', 'g2-fpm', 'g2-fpm-top', 'g2-fpm-marks',
+  'g2-map-structure', 'g2-map-object-strip', 'g2-map-tree-composite', 'g2-rowflat', 'g2-map-flatpiece'];
+function 사물3D숨김인가(e) {
+  if (!e) return false;
+  if (e._3D숨김부모 === e.parentNode && e._3D숨김클 === e.className) return e._3D숨김;
+  var 숨 = false;
+  for (var n = e; n && n.nodeType === 1 && !숨; n = n.parentNode) {
+    var cl = n.classList; if (!cl) continue;
+    for (var i = 0; i < 사물3D숨김클래스.length; i++) if (cl.contains(사물3D숨김클래스[i])) { 숨 = true; break; }
+  }
+  e._3D숨김부모 = e.parentNode; e._3D숨김클 = e.className; e._3D숨김 = 숨;
+  return 숨;
+}
 Renderer.prototype._apply본 = function () {
+  /* 정본 400 — 성능 기록 구간: 화면 반영 안을 덩어리로 나눠 잰다(갤럭시 S24 1-7 필살기 «표시» 290ms 장 — 3D 세부는 작아 2.5D 어디인지 몰랐다) · G2성능 없으면 아무 일 없음 */
+  var _성 = root.G2성능, _잰 = _성 ? performance.now() : 0, _잼 = function (키) { if (!_성) return; var n = performance.now(); _성.더하기(키, n - _잰); _잰 = n; };
   if (this._애니타일밀림 && !this._타일층숨음()) { try { this._애니타일다시칠하기(); } catch (e애) { this._애니타일밀림 = false; } }   /* 정본 400 — 3D 동안 미룬 애니 타일 칠(3D 를 끈 첫 갱신에) */
   if (this._칠밀림 && this._칠밀림.length) { try { this._밀린칠하기(); } catch (e밀) {} }   /* 스케일러 팔레트 — 화면에 들어온 조각을 칠한다 */
   /* ★ 맵 아이템(보물)도 함께 갱신한다 — 먹으면 상자가 열린 그림으로 바뀐다
    *   (원본 0x1862F 가 `sete al` 로 「이미 먹었나」를 인덱스에 더한다). */
+  _잼('반영:밀린칠');
   try { if (this.b && this.syncMapItems) this.syncMapItems(this.b); } catch (e아이템) {}
   var c = this.cam;
   this._FR08나무표시적용();
@@ -13416,9 +13433,15 @@ Renderer.prototype._apply본 = function () {
   /* 세워 놓은 것들(유닛·이펙트·선택 상자) — 부모 회전을 되돌려 화면 정면을 보게 합니다.
    * 바닥과 오브젝트는 눕힌 채 두므로 여기서 건드리지 않습니다. */
   var self = this;
+  _잼('반영:카메라');
   this.b.units.forEach(function (u) { self.updateUnit(u); });
   Object.keys(this.unitEls).forEach(function (k) { self._빌보드적용(self.unitEls[k]); });
-  this.objEls.forEach(function (e) { self._빌보드적용(e); });
+  _잼('반영:유닛');
+  /* 정본 400 — 3D 가 켜져 있는 동안(호스트 g2-3d맵 · 기울기·회전 있음) 맵 사물 판은 CSS 로 감춰진다(리마스터3D 규칙넣기 · 3D 장면이 대신 그림) — 그 판을 반영마다 세워 놓지 않는다
+   *   (측정 크롬 1-7 기울기 45 · 필살기: 반영 한 번에 사물 178개 전부 감춰진 채 세워 놓기 · 휴대폰 흉내 ×6 반영:유닛+사물 구간의 큰 몫)
+   *   3D 를 끄는 장(기울기 0)에는 건너뛰지 않아 그 장에 제자리로 놓인다 · 끄기 window.__숨은사물도세움 */
+  var _3D숨김 = !root.__숨은사물도세움 && !!(this.host && this.host.classList.contains('g2-3d맵') && c && (c.tilt || c.rot) && !root.__리마스터3D끄기);
+  this.objEls.forEach(function (e) { if (_3D숨김 && 사물3D숨김인가(e)) return; self._빌보드적용(e); });
   /* ★ 원본은 서 있는 오브젝트를 «윗변이 화면 −80 이상 · 196 미만»일 때만 그린다 (2026-09-25)
    *   0x10CBD 목록 만들기: 0x10D13 윗변 = 행 화면 y − 높이 · 0x10D21 +0x50 · 0x10D2B cmp di,0x114 · jae(부호 없음) → 목록에서 뺌.
    *   원본 그리기 기록(칸 0·3·145): 원본 오브젝트는 모두 우리와 같은 자리였고, 우리에만 «윗변 −92» 줄이 더 있었다(화면 위 4px 걸침).
@@ -13467,6 +13490,7 @@ Renderer.prototype._apply본 = function () {
     });
   });
   /* 행동 가능 마커도 유닛 박스의 자식이라 유닛 변환을 물려받습니다 (readyMarks 참고) */
+  _잼('반영:사물');
   this.fxEls.forEach(function (e) { self._빌보드적용(e); });
   /* 집중 이펙트는 유닛 박스의 자식이라 유닛 변환을 그대로 물려받습니다 —
    * 여기서 따로 걸지 않습니다(걸면 회전 중심이 달라 유닛에서 떨어집니다). */
@@ -13509,6 +13533,7 @@ Renderer.prototype._apply본 = function () {
    *   `foldY > 0` 이면서 `.FPM` 도 있는 맵 — 위 주석의 「생기면 다시 본다」가 이것이다.
    *   각도가 배경벽과 조금이라도 다르면 깊이가 갈려 **DOM 순서로 못 이긴다.** */
   if (this.fpmTopEl) this.fpmTopEl.style.transform = 'rotateX(' + (-c.tilt) + 'deg)';
+  _잼('반영:연출');
   this._원경시차반영(vcx, vcy);
   this._스프라이트대열정렬();
   try { this._평면대열적용(worldTf); } catch (e평면) { if (root.console) console.warn('[평면대열]', e평면 && e평면.message); }
@@ -13526,6 +13551,7 @@ Renderer.prototype._apply본 = function () {
    *
    *   `apply()` 는 프레임당 한 번 도는 배치 마무리라 여기가 맞다. 붙는 쪽에서
    *   microtask 로 병합하므로 여러 번 불려도 동기는 한 번이다. */
+  _잼('반영:대열');
   this._시각변경알림('apply');
 };
 
