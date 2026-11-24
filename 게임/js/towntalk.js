@@ -235,6 +235,90 @@ function 가운데X(글) {
  * @param {Uint8Array} 팔  `decodePalette` 가 편 8비트 팔레트
  */
 var 어둡게표 = {};   /* 정본 400 — «밝기 → 색» 표 (팔레트 24값·보간 여부마다 하나) — 어둡게() 안 주석 */
+/* 정본 400 — 어둡게를 그래픽 카드(WebGL2)에서: 화면을 CPU 로 되읽지(getImageData) 않는다
+ *   되읽기는 그래픽 카드가 하던 일을 다 끝낼 때까지 기다리게 해 안드로이드에서 특히 비쌌다
+ *   (갤럭시 S24 기록 R0.1.98 마을 대사 중 장마다 셸 28~30ms · 측정 크롬 CPU×4 대사 중 어둡게 장당 5ms 중 되읽기 4ms)
+ *   같은 «밝기 → 색» 표(어둡게표)와 같은 마스크(건드리지 않는 칸)를 텍스처로 넘겨 같은 정수 식으로 칠한다 — 결과 같음(town_darken_gpu_400 화소 견줌)
+ *   WebGL2 가 없거나 실패하면 CPU 길 · 끄기 window.__어둡게CPU */
+var 어GPU = null;
+function 어GPU준비() {
+  if (어GPU) return 어GPU.gl ? 어GPU : null;
+  어GPU = {};
+  try {
+    var d = root.document; if (!d || !d.createElement) return null;
+    var cv = d.createElement('canvas');
+    var gl = cv.getContext('webgl2', { premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: false, alpha: true, depth: false, stencil: false });
+    if (!gl) return null;
+    var 셰 = function (종, 글) { var s = gl.createShader(종); gl.shaderSource(s, 글); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+    var pr = gl.createProgram();
+    gl.attachShader(pr, 셰(gl.VERTEX_SHADER, '#version 300 es\nin vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}'));
+    gl.attachShader(pr, 셰(gl.FRAGMENT_SHADER, '#version 300 es\nprecision highp float;precision highp int;' +
+      'uniform highp sampler2D uSrc;uniform highp sampler2D uMask;uniform highp sampler2D uLut;uniform int uH;out vec4 o;' +
+      'void main(){ivec2 q=ivec2(gl_FragCoord.xy);q.y=uH-1-q.y;vec4 c=texelFetch(uSrc,q,0);' +
+      'if(texelFetch(uMask,q,0).r>0.5){o=c;return;}' +
+      'ivec3 v=ivec3(floor(c.rgb*255.0+0.5));int b=(v.r>>2)+(v.g>>2)+(v.b>>2);' +
+      'o=vec4(texelFetch(uLut,ivec2(b,0),0).rgb,1.0);}'));
+    gl.bindAttribLocation(pr, 0, 'p'); gl.linkProgram(pr);
+    if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+    gl.useProgram(pr);
+    var bf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, bf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    var 텍 = function (단) { var t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + 단); gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); return t; };
+    var tSrc = 텍(0), tMask = 텍(1), tLut = 텍(2);
+    gl.uniform1i(gl.getUniformLocation(pr, 'uSrc'), 0); gl.uniform1i(gl.getUniformLocation(pr, 'uMask'), 1); gl.uniform1i(gl.getUniformLocation(pr, 'uLut'), 2);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+    var 판 = d.createElement('canvas');
+    어GPU = { cv: cv, gl: gl, uH: gl.getUniformLocation(pr, 'uH'), tSrc: tSrc, tMask: tMask, tLut: tLut, 판: 판, 판g: 판.getContext('2d'), 마스크키: null, 표: null };
+    return 어GPU;
+  } catch (e) { 어GPU = {}; try { console.warn('[어둡게GPU] ' + (e && e.message)); } catch (x) {} return null; }
+}
+/* 마스크(pw×ph · 1 = 건드리지 않는 칸)를 만든다 — 어둡게() 고리의 자리 식 그대로 (자료 없으면 전부 0 = 다 칠함 · 어둡게사각형) */
+function 어GPU마스크(자료, w, h, 배X, 배Y, pw, ph) {
+  var m = new Uint8Array(pw * ph);
+  if (!자료) return m;
+  var 열 = new Int32Array(pw);
+  for (var x = 0; x < pw; x++) { var mx = (x / 배X) | 0; if (mx >= w) mx = w - 1; 열[x] = mx; }
+  for (var y = 0; y < ph; y++) { var my = (y / 배Y) | 0; if (my >= h) my = h - 1; var 줄 = 4 + my * w, o = y * pw;
+    for (var x2 = 0; x2 < pw; x2++) if (자료[줄 + 열[x2]] === 0xFF) m[o + x2] = 255; }
+  return m;
+}
+function 어둡게GPU(ctx, px0, py0, pw, ph, 표, 마스크키, 마스크만들기) {
+  if (root.__어둡게CPU || !ctx || !ctx.canvas) return false;
+  var G = 어GPU준비(); if (!G) return false;
+  var gl = G.gl;
+  try {
+    if (gl.isContextLost()) return false;
+    if (G.판.width !== pw || G.판.height !== ph) { G.판.width = pw; G.판.height = ph; G.판g = G.판.getContext('2d'); }
+    G.판g.imageSmoothingEnabled = false; G.판g.globalCompositeOperation = 'copy';
+    G.판g.drawImage(ctx.canvas, px0, py0, pw, ph, 0, 0, pw, ph);             /* 그래픽 카드 안에서 영역만 옮긴다 */
+    if (G.cv.width !== pw || G.cv.height !== ph) { G.cv.width = pw; G.cv.height = ph; }
+    gl.viewport(0, 0, pw, ph);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, G.tSrc);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, G.판);
+    if (G.마스크키 !== 마스크키) {
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, G.tMask);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, pw, ph, 0, gl.RED, gl.UNSIGNED_BYTE, 마스크만들기());
+      G.마스크키 = 마스크키;
+    }
+    if (G.표 !== 표) {
+      var lut = new Uint8Array(256 * 4);
+      for (var i = 0; i < 190; i++) { lut[i * 4] = 표[i * 3]; lut[i * 4 + 1] = 표[i * 3 + 1]; lut[i * 4 + 2] = 표[i * 3 + 2]; lut[i * 4 + 3] = 255; }
+      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, G.tLut);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, lut);
+      G.표 = 표;
+    }
+    gl.uniform1i(G.uH, ph);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.beginPath(); ctx.rect(px0, py0, pw, ph); ctx.clip();
+    ctx.globalCompositeOperation = 'copy'; ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(G.cv, px0, py0);
+    ctx.restore();
+    return true;
+  } catch (e) { try { console.warn('[어둡게GPU] ' + (e && e.message)); } catch (x) {} 어GPU = {}; return false; }
+}
 function 어둡게(ctx, 자료, x, y, 팔) {
   if (!ctx || !자료 || !팔) return false;
   var w = (자료[0] | 0) | ((자료[1] | 0) << 8);
@@ -253,7 +337,7 @@ function 어둡게(ctx, 자료, x, y, 팔) {
   var px0 = Math.round(x * 배X + 밀X), py0 = Math.round(y * 배Y + 밀Y);
   var pw = Math.max(1, Math.round(w * 배X)), ph = Math.max(1, Math.round(h * 배Y));
 
-  var im = ctx.getImageData(px0, py0, pw, ph), px = im.data;
+  var im, px;
   /* [리마스터] 스케일러가 켜져 캔버스가 1배보다 크면 8단계 양자화 대신 회색 램프(팔레트 0~7)를 밝기로 **보간** — 원작(0x186DC)은 팔레트 색인 8단계라
    *   xBRZ 가 만든 중간색이 전부 8색으로 눌려 창 안 배경이 도트로 보였다 (11-13 사장님 마을 이벤트 대사 사진) */
   var 보간 = !!(root.G2Scaler && typeof root.G2Scaler.N === 'function' && root.G2Scaler.N() > 1 && 배X > 1.01);
@@ -279,6 +363,8 @@ function 어둡게(ctx, 자료, x, y, 팔) {
       }
       어둡게표[표키] = 표;
     }
+    if (어둡게GPU(ctx, px0, py0, pw, ph, 표, 자료.length + '|' + w + 'x' + h + '|' + 배X + ',' + 배Y + '|' + pw + 'x' + ph + '|' + (자료.byteOffset | 0), function () { return 어GPU마스크(자료, w, h, 배X, 배Y, pw, ph); })) return true;   /* 정본 400 — 어GPU준비 주석 */
+    im = ctx.getImageData(px0, py0, pw, ph); px = im.data;
     var 열 = new Int32Array(pw);
     for (var x1 = 0; x1 < pw; x1++) { var m1 = (x1 / 배X) | 0; if (m1 >= w) m1 = w - 1; 열[x1] = m1; }
     for (var y1 = 0; y1 < ph; y1++) {
@@ -293,6 +379,7 @@ function 어둡게(ctx, 자료, x, y, 팔) {
     ctx.putImageData(im, px0, py0);
     return true;
   }
+  im = ctx.getImageData(px0, py0, pw, ph); px = im.data;
   for (var yy = 0; yy < ph; yy++) {
     var my = (yy / 배Y) | 0; if (my >= h) my = h - 1;
     for (var xx = 0; xx < pw; xx++) {
@@ -360,6 +447,13 @@ function 어둡게사각형(ctx, x1, y1, x2, y2, 팔) {
   var px0 = Math.round((x1 | 0) * 배X + 밀X), py0 = Math.round((y1 | 0) * 배Y + 밀Y);
   var pw = Math.max(1, Math.round(w * 배X)), ph = Math.max(1, Math.round(h * 배Y));
 
+  /* 정본 400 — 그래픽 카드 길(어GPU준비 주석) · 8단계 표 = 어둡게() 의 보간 아님 표와 같은 식 */
+  if (!root.__어둡게CPU) {
+    var 표키4 = 'q' + Array.prototype.join.call(팔.subarray ? 팔.subarray(0, 24) : Array.prototype.slice.call(팔, 0, 24), ',');
+    var 표4 = 어둡게표[표키4];
+    if (!표4) { 표4 = new Uint8Array(190 * 3); for (var 밝4 = 0; 밝4 < 190; 밝4++) { var k4 = 7 - ((밝4 / 37) | 0); if (k4 < 0) k4 = 0; if (k4 > 7) k4 = 7; 표4[밝4 * 3] = 팔[k4 * 3]; 표4[밝4 * 3 + 1] = 팔[k4 * 3 + 1]; 표4[밝4 * 3 + 2] = 팔[k4 * 3 + 2]; } 어둡게표[표키4] = 표4; }
+    if (어둡게GPU(ctx, px0, py0, pw, ph, 표4, '사각|' + pw + 'x' + ph, function () { return 어GPU마스크(null, 0, 0, 1, 1, pw, ph); })) return true;
+  }
   var im = ctx.getImageData(px0, py0, pw, ph), px = im.data;
   for (var i = 0; i < px.length; i += 4) {
     /* ★ 6비트로 낮춰 잰다 — 원본 팔레트가 0~63 이다 */
