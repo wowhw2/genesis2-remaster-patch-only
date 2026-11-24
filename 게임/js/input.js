@@ -436,6 +436,8 @@
         if (!창 || !창.addEventListener || 붙임) return 공급;
         창.addEventListener('keydown', 눌림, false);
         창.addEventListener('keyup', 떼짐, false);
+        /* 정본 443 — 창이 포커스를 잃으면(다른 창·알림으로 넘어감) 그 사이 뗀 키의 keyup 이 안 온다 → 눌렸던 게임 키를 모두 뗀 것으로 넣는다 */
+        창.addEventListener('blur', function () { Object.keys(배치).forEach(function (k) { var 키 = 배치[k]; if (키 && !대기.some(function (q) { return q && q.종류 === '떼짐' && q.키 === 키; })) 대기.push(입력('떼짐', 키, { key: k, 포커스잃음: true })); }); }, false);
         if (좌표 && 마우스대상 && 마우스대상.addEventListener) {
           마우스대상.addEventListener('mousemove', 움직임, false);
           마우스대상.addEventListener('mousedown', 누름, false);
