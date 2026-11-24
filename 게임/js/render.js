@@ -8702,6 +8702,10 @@ Renderer.prototype.애니판그룹 = function (그룹, 타일, 칸목) {
       this.tileLayer.classList && this.tileLayer.classList.contains('g2-tilelayer3d')) {
     (this._애니판목록 || (this._애니판목록 = {}))[그룹] = { 타일: 타일 | 0, 칸목: 칸목 };
     if (this._애니판타일) delete this._애니판타일[그룹];
+    /* ★ 정본 461 — 3D 로 숨어 있는 동안은 판(맵 전체 × 스케일러 배 · 1-7 2배 3408×2080 = 7.1M화소 ≈ 28MB)을 내려놓는다
+     *   3D 를 켜기 전 2D 로 그린 판이 숨은 채 메모리를 붙잡아 휴대폰 3D 전투가 메모리 부족으로 꺼졌다(신고 튕김기록_휴대폰 11-24 · 캔버스 121장 20.7M화소)
+     *   다시 보이면(3D 끔) 아래 «판이 없으면 새로 만들고 모든 그룹을 다시 칠한다» 길을 탄다 */
+    if (this._애니판) { if (this._애니판.parentNode) this._애니판.parentNode.removeChild(this._애니판); this._애니판.width = this._애니판.height = 0; this._애니판 = null; this._애니판타일 = {}; this._애니판내려놓음 = true; this._애니타일밀림 = true; }
     return true;
   }
   var src = this.tileCanvas(타일);
@@ -8788,7 +8792,8 @@ Renderer.prototype._애니타일다시칠하기 = function () {
   if (this._애니판 && this._애니판목록 === null && fx && fx.renderer === this &&
       typeof fx.tileAnim === 'function') fx.tileAnim(null, 0);
   /* 애니 판(캔버스 한 장) — 그룹마다 지금 그림으로 곧바로 다시 칠한다 */
-  if (this._애니판 && this._애니판목록) {
+  if ((this._애니판 || this._애니판내려놓음) && this._애니판목록) {   /* 정본 461 — 3D 동안 내려놓았으면 다시 보일 때 판을 새로 만들어 칠한다 */
+    this._애니판내려놓음 = false;
     this._애니판타일 = {};
     var 목 = this._애니판목록;
     Object.keys(목).forEach(function (g) { self.애니판그룹(g | 0, 목[g].타일, 목[g].칸목); });
