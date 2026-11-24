@@ -51,6 +51,8 @@
     });
   }
   function 가운데로() { 쏘기('mousemove', innerWidth / 2, innerHeight / 2, 0); }
+  /* 정본 453 — 끌어서 맵 밀기를 하는 화면: 전투·월드 (캐릭터 창 STATUS·EQUIP 은 다른 화면이라 아이템 끌기는 그대로) */
+  function 밀기화면() { try { var c = root.__셸 && root.__셸.현재 && root.__셸.현재(), n = c ? (c.화면 || c.이름) : null; return n === 'BATTLE' || n === 'WORLD'; } catch (e) { return false; } }
 
   var 판위 = function (el) { return !!(el && el.closest && el.closest('.g2판')); };   /* ESC 단추·가상 패드 — 클릭으로 바꾸지 않는다 */
   /* 정본 342 — 글칸(버그 신고 설명 등)은 손대지 않는다: 눌러 글쇠판·길게 눌러 복사·붙여넣기 (사장님 11-20 신고 「버그리포트에 복사 붙여넣기 가능했으면 합니다」) */
@@ -68,7 +70,7 @@
     }
     root.__패드커서숨김 = true;   /* 손가락에는 커서 그림이 없다 — 패드와 같은 숨김(진짜 마우스를 움직이면 pad_input 이 다시 켠다) */
     var t = e.changedTouches[0];
-    지금 = { x: t.clientX, y: t.clientY, 움직임: false, 오른쪽: false, 버림: false, 시작: Date.now() };
+    지금 = { x: t.clientX, y: t.clientY, 움직임: false, 오른쪽: false, 버림: false, 시작: Date.now(), sx: t.clientX, sy: t.clientY };   /* sx·sy = 처음 누른 자리 (정본 453 터치스크린 모드 문턱) */
     쏘기('mousemove', t.clientX, t.clientY, 0);
     지금.타이머 = setTimeout(function () {
       if (!지금 || 지금.움직임 || 지금.버림) return;
@@ -94,7 +96,28 @@
     if (!지금 || 지금.버림) return;
     e.preventDefault();
     var t = e.changedTouches[0];
-    if (!지금.움직임 && !지금.누름 && Math.hypot(t.clientX - 지금.x, t.clientY - 지금.y) > 한도 && !지금.오른쪽) {   /* 누름 유지 중이면 이미 눌렸다 — 끌기만 */
+    /* 정본 453 — 터치스크린 모드 · 전투·월드에서 바로 끌면(누름 유지 전) 맵 밀기: 두 손가락 쓸기(터치패드 휠)와 같은 신호를 보낸다
+     *   (전투 battle_main 쓸기 → R.scrollScreen · 월드 게임.html 휠손가락 → 카메라 수동) · 맵이 손가락을 따라 움직이게 −(손 움직임)
+     *   deltaX 를 늘 0 이 아니게 두어 받는 쪽이 «터치패드 쓸기»로 본다 · 밀기 중엔 마우스를 안 옮긴다(가장자리 스크롤이 겹치지 않게)
+     *   (사장님 11-24 「끌어서 맵 밀기 넣어봐」) */
+    if (지금.밀기) {
+      var 받는곳 = document.elementFromPoint(지금.x, 지금.y) || document.body, dx = t.clientX - 지금.x, dy = t.clientY - 지금.y;
+      if (dx || dy) 받는곳.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, view: root, clientX: t.clientX, clientY: t.clientY, deltaMode: 0,
+                                                              deltaX: -dx || 0.001, deltaY: -dy + 0.001 }));
+      지금.x = t.clientX; 지금.y = t.clientY;
+      return;
+    }
+    /* 정본 453 — 터치스크린 모드는 문턱을 «처음 누른 자리»부터 잰다: 바로 앞 자리부터 재면 손가락이 잘게(몇 px 씩) 움직일 때 끝까지 14px 를 못 넘어 끌기가 톡이 됐다 */
+    var 문턱자리 = 터치모드 ? { x: 지금.sx, y: 지금.sy } : 지금;
+    if (!지금.움직임 && !지금.누름 && Math.hypot(t.clientX - 문턱자리.x, t.clientY - 문턱자리.y) > 한도 && !지금.오른쪽) {   /* 누름 유지 중이면 이미 눌렸다 — 끌기만 */
+      if (터치모드 && 밀기화면()) {   /* 처음 누른 자리부터 민다 — 문턱만큼 움직인 몫도 버리지 않게 */
+        지금.밀기 = true; clearTimeout(지금.타이머);
+        var 첫곳 = document.elementFromPoint(지금.sx, 지금.sy) || document.body;
+        첫곳.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, view: root, clientX: t.clientX, clientY: t.clientY, deltaMode: 0,
+                                                  deltaX: -(t.clientX - 지금.sx) || 0.001, deltaY: -(t.clientY - 지금.sy) + 0.001 }));
+        지금.x = t.clientX; 지금.y = t.clientY;
+        return;
+      }
       지금.움직임 = true; clearTimeout(지금.타이머);
       쏘기('mousedown', 지금.x, 지금.y, 0);
     }
@@ -117,6 +140,7 @@
     e.preventDefault();
     clearTimeout(지금.타이머);
     var s = 지금; 지금 = null;
+    if (s.밀기) { setTimeout(가운데로, 250); return; }   /* 정본 453 — 맵 밀기였으면 클릭 안 함 */
     if (s.누름 && !s.버림) { 쏘기('mouseup', s.x, s.y, 0); 쏘기('click', s.x, s.y, 0); setTimeout(가운데로, 250); return; }   /* 터치스크린 모드 누름 유지 — 진짜 마우스처럼 떼기 */
     if (s.버림 || s.오른쪽) { setTimeout(가운데로, 250); return; }
     /* 게임은 «올려 둔 자리»(월드 지점 누를것 등)를 한 장 그릴 때 잰다 — 짧은 터치는 그 전에 눌러 버린다(11-19 에뮬레이터 실측: 월드 지점이 안 눌림)
