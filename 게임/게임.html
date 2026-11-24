@@ -192,6 +192,22 @@
     return cv;
   };
   N.exeFontToCanvas.__되쓰기 = true;
+  /* 같은 까닭으로 월드 글자(NEWASCII · 남은 날 «31 Days remain» 등)도 — 장마다 새로 만들고 키워 월드에 있는 동안 1초에 120번 남짓 스케일러가 돌았다(측정 창 4배)
+   *   열쇠 = 글꼴 · 스케일러 · 색(rgb) · 문자열 */
+  if (typeof N.newasciiToCanvas === 'function' && !N.newasciiToCanvas.__되쓰기) {
+    var 원A = N.newasciiToCanvas, 캐시A = new Map();
+    N.newasciiToCanvas = function (glyphs, s, rgb) {
+      if (!glyphs || typeof glyphs !== 'object' || !s) return 원A.apply(this, arguments);
+      var fn = 글꼴번호.get(glyphs); if (!fn) { fn = 다음++; 글꼴번호.set(glyphs, fn); }
+      var 스 = window.G2Scaler && G2Scaler.cur ? G2Scaler.cur() + (G2Scaler.N ? G2Scaler.N() : '') : '';
+      var k = fn + '|' + 스 + '|' + (rgb ? (rgb[0] | 0) + ',' + (rgb[1] | 0) + ',' + (rgb[2] | 0) : '-') + '|' + s;
+      if (캐시A.has(k)) return 캐시A.get(k);
+      var cv = 원A.apply(this, arguments);
+      if (cv) { if (캐시A.size >= 2000) 캐시A.delete(캐시A.keys().next().value); 캐시A.set(k, cv); }
+      return cv;
+    };
+    N.newasciiToCanvas.__되쓰기 = true;
+  }
 })();
 </script>
 <script src="/js/exe_image.js"></script> <!-- ★ EXE bytes→LE 이미지 공통 수명 경계 -->
@@ -2056,11 +2072,15 @@ window.G2_셸이몬다 = true;
             if (둘[2] && 것.팔레트) {
               try {
                 var fd = G2Native.decodeNC2(둘[2]);
-                것.글꼴캔 = (fd.frames || []).map(function (f) {
-                  var c = G2Native.frameToCanvas(f, 것.팔레트);
-                  c.앵커x = f.ax; c.앵커y = f.ay; c.논리폭 = f.w;
-                  return c;
-                });
+                /* ★ 정본 463 — 글꼴 265자를 «꺼낼 때 처음» 만든다(월드 첫 열기에 한꺼번에 만들고 키워 0.2초 · 휴대폰 신고 월드 셸 멈춤 최장 0.9초)
+                 *   쓰는 곳은 «길이 + 번호로 꺼내기»뿐(월드 글자 그리기 8202) · 길이는 원래 장 수 */
+                var 글꼴프레임 = fd.frames || [], 팔글 = 것.팔레트;
+                var 글꼴만들기 = function (f) { var c = G2Native.frameToCanvas(f, 팔글); if (c) { c.앵커x = f.ax; c.앵커y = f.ay; c.논리폭 = f.w; } return c; };
+                것.글꼴캔 = (typeof Proxy !== 'function') ? 글꼴프레임.map(글꼴만들기) : new Proxy([], { get: function (t, k) {
+                  if (k === 'length') return Math.max(t.length, 글꼴프레임.length);
+                  if (typeof k === 'string' && /^[0-9]+$/.test(k) && !(k in t)) { var f = 글꼴프레임[k | 0]; t[k] = f ? 글꼴만들기(f) : null; }
+                  return t[k];
+                } });
               } catch (e) { console.warn('[월드] FONT.SPR — ' + e.message); }
             }
             /* ══════════════════════════════════════════════════════════
