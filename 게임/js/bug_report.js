@@ -97,14 +97,16 @@
     o.유닛그림 = 해(function () {
       var R = root.R; if (!R || !R.unitEls) return null;
       var 보 = function (e) { var s = getComputedStyle(e), r = e.getBoundingClientRect(); return { 보임: s.display !== 'none' && s.visibility !== 'hidden' && +s.opacity > 0, 크기: Math.round(r.width) + '×' + Math.round(r.height), 자리: Math.round(r.left) + ',' + Math.round(r.top) }; };
-      var 칠함 = function (c) { try { var w = c.width, h = c.height; if (!w || !h) return '빈 캔버스'; var d = c.getContext('2d').getImageData(0, 0, w, h).data, n = 0; for (var i = 3; i < d.length; i += 4) if (d[i]) n++; return n + '점'; } catch (e) { return '못 읽음(' + (e && e.name) + ')'; } };
+      var 칠함 = function (c) { try { var w = c.width, h = c.height; if (!w || !h) return '빈 캔버스'; var cx0 = c.getContext('2d'); if (cx0 && cx0.isContextLost && cx0.isContextLost()) return '잃음';   /* 정본 460 — 그래픽 카드가 멈췄다 돌아오면 2D 캔버스가 «잃음»이 되어 칠해도 빈다 */ var d = c.getContext('2d').getImageData(0, 0, w, h).data, n = 0; for (var i = 3; i < d.length; i += 4) if (d[i]) n++; return n + '점'; } catch (e) { return '못 읽음(' + (e && e.name) + ')'; } };
       var 키 = Object.keys(R.unitEls), 표본 = 키.slice(0, 8).map(function (k) {
         var e = R.unitEls[k], b = 보(e), 캔 = [].slice.call(e.querySelectorAll('canvas')).map(function (c) { return c.width + '×' + c.height + ' ' + 칠함(c); });
         return k + ' ' + (b.보임 ? '보임' : '숨김') + ' ' + b.크기 + ' @' + b.자리 + ' 그림:' + (e.style.backgroundImage ? '있음' : '없음') + ' 캔버스[' + 캔.join(' · ') + ']';
       });
       var 층 = []; for (var p = 키.length ? R.unitEls[키[0]].parentElement : null, i = 0; p && i < 6; p = p.parentElement, i++) { var s = getComputedStyle(p); 층.push((p.id || p.className || p.tagName).toString().slice(0, 30) + ' ' + s.display + '/' + s.visibility + '/' + s.opacity); }
       var 실패 = []; try { (performance.getEntriesByType('resource') || []).forEach(function (r) { if (r.responseStatus >= 400) 실패.push(r.responseStatus + ' ' + decodeURIComponent(String(r.name).replace(/^https?:\/\/[^/]+/, ''))); }); } catch (e) { }
-      return { 수: 키.length, 표본: 표본, 층: 층, 보기3D: !!document.querySelector('.g2-3d맵'), GPU칠하기: root.G2PaletteGPU && G2PaletteGPU.상태 ? G2PaletteGPU.상태() : null, 받기실패: 실패.slice(-20) };
+      var 모든캔 = document.getElementsByTagName('canvas'), 합화소 = 0, 잃은 = 0; for (var ci = 0; ci < 모든캔.length; ci++) { 합화소 += 모든캔[ci].width * 모든캔[ci].height; }
+      [].slice.call(document.querySelectorAll('.g2-sprite-layer canvas')).forEach(function (c) { try { var x = c.getContext('2d'); if (x && x.isContextLost && x.isContextLost()) 잃은++; } catch (e) { } });
+      return { 수: 키.length, 표본: 표본, 층: 층, 캔버스: 모든캔.length + '장 ' + (합화소 / 1e6).toFixed(1) + 'M화소', 유닛층잃은캔버스: 잃은, GPU끔: !!root.__유닛GPU끔, 보기3D: !!document.querySelector('.g2-3d맵'), GPU칠하기: root.G2PaletteGPU && G2PaletteGPU.상태 ? G2PaletteGPU.상태() : null, 받기실패: 실패.slice(-20) };
     });
     o.모바일 = 모바일;
     o.메모리MB = 해(function () { return performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) + ' / ' + Math.round(performance.memory.jsHeapSizeLimit / 1048576) : null; });
@@ -315,7 +317,7 @@
    *   (사장님 11-23 「내가 어떻게 개별적으로 전달하냐고!」) ⇒ 사람에게 «다시 신고해 달라»고 하지 않는다
    *   전투 대기(FRAME_IDLE) · 살아 있는 유닛 둘 이상 · 3초마다: 상자가 없거나 상자 안 캔버스에 칠한 점이 하나도 없으면 «안 보임»
    *   9초 이어지면 유닛 상자를 다시 짓게 한다(updateUnit — 층이 비면 다시 지음) · 18초 이어지면 고치기 전후 상태를 담아 하루 한 번 «유닛안보임진단_…zip» */
-  var 유닛감시 = { 연속: 0, 고친앞: null, 보냄: false };
+  var 유닛감시 = { 연속: 0, 고친앞: null, 보냄: false, 고친때: 0 };
   function 점있나(c) { try { if (!c.width || !c.height) return false; var d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (var i = 3; i < d.length; i += 4) if (d[i]) return true; } catch (e) { return true; } return false; }   /* 못 읽으면 «있음»으로 — 잘못 알리지 않게 */
   function 유닛안보이나() {
     var R = root.R, B = root.battle, C = root.ctrl;
@@ -340,7 +342,7 @@
     if (!상자) return null;
     return 칠함 === 0;   /* 상자가 하나도 없어도 «안 보임» */
   }
-  function 유닛다시짓기(GPU끔) {
+  function 유닛다시짓기(GPU끔, 새캔버스) {
     var R = root.R, B = root.battle;
     /* ★ 정본 436 — 빈 그림이 담긴 장 캐시·유닛 GPU 판까지 비운다(상자만 다시 지으면 같은 빈 장을 또 칠했다)
      *   두 번째(GPU끔)부터는 유닛 몸을 그래픽 카드 없이(CPU 길로) 칠한다 — render.js 유닛공급자 */
@@ -350,6 +352,8 @@
       R._유닛바탕 = null; R._uurl = {};
     } catch (e1) { }
     if (GPU끔) root.__유닛GPU끔 = true;
+    /* ★ 정본 460 — 몸 캔버스도 새로 만든다: 그래픽 카드가 멈췄다 돌아오면 옛 캔버스가 «잃음»이라 무엇을 칠해도 빈 채였다(같은 캔버스에 다시 칠하던 옛 길로는 안 나음 · 고성능 카드 신고) */
+    if (새캔버스) B.units.forEach(function (u) { var e = u && R.unitEls[u.id]; if (!e) return; (e._layers || []).forEach(function (L) { if (L && L.el && L.el._판) { try { if (L.el._판.parentNode) L.el._판.parentNode.removeChild(L.el._판); } catch (x) { } L.el._판 = null; } }); });
     B.units.forEach(function (u) { var e = u && R.unitEls[u.id]; if (e) { e._layerSig = null; (e._layers || []).forEach(function (L) { if (L && L.el) L.el._url = null; }); } try { R.updateUnit(u); } catch (e2) { } });
     try { if (R.apply) R.apply(); } catch (e3) { }
   }
@@ -373,17 +377,18 @@
     try {
       if (document.hidden) return;
       var 안 = 유닛안보이나();
-      if (안 !== true) { 유닛감시.연속 = 0; return; }
+      if (안 !== true) { if (안 === false && 유닛감시.고친때) { console.warn('[유닛감시] 다시 보인다 — 고친 뒤 ' + Math.round((Date.now() - 유닛감시.고친때) / 1000) + '초 (그래픽 카드 없이 · 새 캔버스)'); 유닛감시.고친때 = 0; } 유닛감시.연속 = 0; return; }
       유닛감시.연속++;
       if (유닛감시.연속 === 3) {
         try { 유닛감시.고친앞 = 진단().유닛그림; } catch (e진) { }
-        console.warn('[유닛감시] 전투 유닛이 9초째 하나도 안 그려졌다 — 유닛 상자를 다시 짓는다');
-        유닛다시짓기();
+        /* ★ 정본 460 — 9초째에 곧바로 그래픽 카드 없이 · 몸 캔버스도 새로 (옛: 9초 GPU 길로 다시 · 18초 CPU 길 — 같은 캔버스라 둘 다 빈 채 · 고성능 카드에서도 18초 빈 채) */
+        console.warn('[유닛감시] 전투 유닛이 9초째 하나도 안 그려졌다 — 그래픽 카드 없이 · 몸 캔버스를 새로 만들어 다시 짓는다');
+        유닛다시짓기(true, true); 유닛감시.고친때 = Date.now();
       }
       if (유닛감시.연속 === 6) {
-        console.warn('[유닛감시] 다시 지어도 안 보인다 — 그래픽 카드 없이 다시 짓고 진단을 보낸다');
-        유닛진단보내기('다시 지어도 18초째 안 보임');
-        유닛다시짓기(true);
+        console.warn('[유닛감시] 그래픽 카드 없이 · 새 캔버스로 다시 지어도 안 보인다 — 진단을 보내고 한 번 더 짓는다');
+        유닛진단보내기('그래픽 카드 없이 · 새 캔버스로 다시 지어도 18초째 안 보임');
+        유닛다시짓기(true, true);
       }
     } catch (e) { }
   }, 3000);
