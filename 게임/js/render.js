@@ -12762,7 +12762,9 @@ Renderer.prototype._이벤트카메라한칸 = function () {
     if (q) { this._camQueue = null; this.cameraScroll(q.cx, q.cy, q.step); }
   }
   this.clampCamera();                      // 0x11003 — 맵 밖으로 나가지 않게
-  this.apply();
+  /* 정본 400 — 반영은 이 차례 끝 한 번(apply예약): 같은 장 주 루프가 곧 다시 apply 해 여기서 한 반영(3D 유닛 세우기·스타일 재계산)은 화면에 안 나갔다
+   *   (Odin2 Portal 기록 1-1 시작 이벤트: 한 장 반영 2번 · 3D:유닛 15→31ms · 측정 크롬 휴대폰 흉내 장 59/406 에서 겹침) · 끄기 window.__이벤트카메라즉시반영 */
+  if (this.apply예약 && !root.__이벤트카메라즉시반영) this.apply예약(); else this.apply();
   return !!this._evCam;
 };
 
