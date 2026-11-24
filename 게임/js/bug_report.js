@@ -240,7 +240,27 @@
         fetch('http://127.0.0.1:47861/laststate', { method: 'POST', mode: 'no-cors', body: JSON.stringify(o) }).catch(function () { });
       } catch (e) { }
     };
+    /* 정본 454 — 켤 때 한 번: 지난 튕김이 네이티브 충돌·메모리 부족이고 그때 스케일러가 3·4배였으면 2배로 낮춘다(G2Scaler.튕김낮추기)
+     *   본체가 켤 때 튕김 기록에 «[튕김] …» 다음 줄로 «[마지막 상태] {…스케일러…}» 를 붙인다(본체.js 지난상태) · 같은 튕김은 한 번만(g2.튕김낮춤확인 = 그 줄의 때) */
+    var 튕김살피기 = function () {
+      fetch('http://127.0.0.1:47861/crashlog', { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (글) {
+        var 줄 = String(글 || '').split('\n'), 본 = ''; try { 본 = root.localStorage.getItem('g2.튕김낮춤확인') || ''; } catch (e0) { }
+        for (var i = 줄.length - 1; i >= 0; i--) {
+          if (줄[i].indexOf('[튕김]') < 0 || !/네이티브 충돌|메모리 부족|CRASH|LOW_MEMORY/.test(줄[i])) continue;
+          var 때 = 줄[i].split(' ')[0]; if (!때 || 때 <= 본) return;
+          try { root.localStorage.setItem('g2.튕김낮춤확인', 때); } catch (e1) { }
+          for (var j = i + 1; j < Math.min(줄.length, i + 6); j++) {
+            var m = /\[마지막 상태\] (\{.*\})\s*$/.exec(줄[j]); if (!m) continue;
+            var 상 = null; try { 상 = JSON.parse(m[1]); } catch (e2) { }
+            if (상 && 상.스케일러 && root.G2Scaler && root.G2Scaler.튕김낮추기) root.G2Scaler.튕김낮추기(상.스케일러);
+            break;
+          }
+          return;
+        }
+      }).catch(function () { });
+    };
     if (root.document && root.document.addEventListener && typeof setInterval === 'function') {   /* 화면·타이머가 있을 때만(노드 시험에서는 안 건다) */
+      setTimeout(튕김살피기, 2500);
       setInterval(function () { if (!root.document.hidden) 마지막상태보내기(); }, 30000);
       root.document.addEventListener('visibilitychange', function () { if (root.document.hidden) 마지막상태보내기(); });
     }
