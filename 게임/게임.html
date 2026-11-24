@@ -169,6 +169,31 @@
 <script src="/js/모드.js"></script>   <!-- ★ 원본/리마스터 모드 — 실행기 공용 -->
 <script src="/js/source.js"></script> <!-- ★ SOURCE-001 원본/패치 파일 접근 단일 경계 -->
 <script src="/js/native.js"></script>
+<script>
+/* ★ 정본 462 — EXE 글자 그림 되쓰기: 같은 글꼴·문자열·글자색·스케일러면 지난 그림을 돌려준다 (부르는 곳 넷 모두 그리기만 하고 고쳐 쓰지 않는다)
+ *   ☠ 그릴 때마다 문자열 그림을 새로 만들고 스케일러로 키웠다 — 상태창 첫 열기 두 장에 1,968번(4배 · 측정 창 0.7초 멈춤 · 신고 성능기록 PC STATUS 최장 1.3초)
+ *   native.js 는 앱 안 서버도 쓰는 «엔진» 파일이라(고치면 옛 앱에 새로 설치 안내) 여기서 G2Native.exeFontToCanvas 를 감싼다 · 팔레트는 글자색 r,g,b 하나만 본다 · 4000개 넘으면 오래된 것부터 */
+(function () {
+  var N = window.G2Native; if (!N || typeof N.exeFontToCanvas !== 'function' || N.exeFontToCanvas.__되쓰기) return;
+  var 원 = N.exeFontToCanvas, 캐시 = new Map(), 글꼴번호 = new WeakMap(), 다음 = 1;
+  function 열쇠(f, s, 팔, 색인) {
+    var ci = (색인 != null) ? (색인 | 0) : (f.글자색 | 0), r = 255, g = 255, b = 255;
+    if (팔) { if (팔[ci] && 팔[ci].length >= 3) { r = 팔[ci][0]; g = 팔[ci][1]; b = 팔[ci][2]; } else if (팔.length >= 768) { r = 팔[ci * 3]; g = 팔[ci * 3 + 1]; b = 팔[ci * 3 + 2]; } }
+    var fn = 글꼴번호.get(f); if (!fn) { fn = 다음++; 글꼴번호.set(f, fn); }
+    var 스 = window.G2Scaler && G2Scaler.cur ? G2Scaler.cur() + (G2Scaler.N ? G2Scaler.N() : '') : '';
+    return fn + '|' + 스 + '|' + r + ',' + g + ',' + b + '|' + s;
+  }
+  N.exeFontToCanvas = function (f, s, 팔, 색인) {
+    if (!f || typeof f !== 'object') return 원.apply(this, arguments);
+    var k = 열쇠(f, String(s), 팔, 색인);
+    if (캐시.has(k)) return 캐시.get(k);
+    var cv = 원.apply(this, arguments);
+    if (cv) { if (캐시.size >= 4000) 캐시.delete(캐시.keys().next().value); 캐시.set(k, cv); }
+    return cv;
+  };
+  N.exeFontToCanvas.__되쓰기 = true;
+})();
+</script>
 <script src="/js/exe_image.js"></script> <!-- ★ EXE bytes→LE 이미지 공통 수명 경계 -->
 <script src="/js/sprite_semantics.js"></script>  <!-- ★ sprite 의미분류 — rules보다 먼저 -->
 <script src="/js/rand.js"></script>  <!-- ★ 원본과 같은 LCG 난수 — 씨앗을 맞추면 연출이 같아진다 -->
@@ -1700,6 +1725,18 @@ window.G2_셸이몬다 = true;
             })
           ]); }).then(function (둘) {
             var 것 = { 배경: null, 팔레트: null, 아이템캔: [], 초상캔: [], 시민캔: [] };
+            /* ★ 정본 462 — 그림 장을 «꺼낼 때 처음» 캔버스로 만든다(번호로 꺼내 쓰는 곳뿐 · 통째로 도는 곳 없음 · char_editor 도 번호)
+             *   ☠ 처음 상태창을 열 때 ITEM.SPR·PORTSMAL·CITIZEN2 모든 장(1,317장)을 한꺼번에 만들고 4배로 키워 0.74초 멈췄다(측정 창 · 신고 성능기록 PC STATUS 최장 1.3초)
+             *   직접 넣은 칸(시민캔[n] = …)은 그대로 · 없는 장은 null */
+            function 게으른캔(프레임들, 팔) {
+              var 칸 = [];
+              if (typeof Proxy !== 'function') return (프레임들 || []).map(function (f) { return f ? G2Native.frameToCanvas(f, 팔) : null; });
+              return new Proxy(칸, { get: function (t, k) {
+                if (k === 'length') return Math.max(t.length, (프레임들 && 프레임들.length) | 0);   /* 길이를 보는 곳이 있다(오른쪽 위 초상 «!초.length») */
+                if (typeof k === 'string' && /^[0-9]+$/.test(k) && !(k in t)) { var f = 프레임들 && 프레임들[k | 0]; t[k] = f ? G2Native.frameToCanvas(f, 팔) : null; }
+                return t[k];
+              } });
+            }
             if (둘[0]) try {
               var pcx = G2Native.decodePcx(둘[0]);
               if (pcx) {
@@ -1712,16 +1749,12 @@ window.G2_셸이몬다 = true;
               /* [리마스터] 덧 아이템 아이콘(js/extitem.js · 코드 125~)을 ITEM.SPR 프레임 뒤에 끼운다 (2026-11-13) */
               if (window.G2ExtItem && G2ExtItem.프레임끼우기) { try { G2ExtItem.프레임끼우기(d); } catch (e덧) {} }
               것.아이템프레임 = d.frames || [];
-              것.아이템캔 = 것.아이템프레임.map(function (f) {
-                return G2Native.frameToCanvas(f, 것.팔레트);
-              });
+              것.아이템캔 = 게으른캔(것.아이템프레임, 것.팔레트);   /* 정본 462 — 꺼낼 때 처음 만든다 */
             } catch (e) { console.warn('[STATUS] ITEM.SPR — ' + e.message); }
             if (둘[2] && 것.팔레트) try {
               var ps = G2Native.decodeSYB(둘[2]);
               것.초상프레임 = ps.frames || [];
-              것.초상캔 = 것.초상프레임.map(function (f) {
-                return G2Native.frameToCanvas(f, 것.팔레트);
-              });
+              것.초상캔 = 게으른캔(것.초상프레임, 것.팔레트);   /* 정본 462 */
             } catch (e) { console.warn('[STATUS] PORTSMAL.SYF — ' + e.message); }
             if (둘[3] && 것.팔레트) try {
               /* ★ `POINT.SPR`·`ITEM.SPR` 과 같은 형식이라 `decodeNC2` 로 읽는다 */
@@ -1733,9 +1766,7 @@ window.G2_셸이몬다 = true;
                *   실측: 222 프레임 · 24×24 앵커 (−12,−11) */
               var cz = G2Native.decodeCitizen(둘[3]);
               것.시민프레임 = (cz && cz.frames) || [];
-              것.시민캔 = 것.시민프레임.map(function (f) {
-                return f ? G2Native.frameToCanvas(f, 것.팔레트) : null;
-              });
+              것.시민캔 = 게으른캔(것.시민프레임, 것.팔레트);   /* 정본 462 */
 
               /* 새 전투 스프라이트의 작은 STATUS 그림. 원본 CITIZEN2에는 대응 프레임이
                * 없으므로 같은 NC2의 정지 정면(3번)을 원본 팔레트로 굽는다. */
