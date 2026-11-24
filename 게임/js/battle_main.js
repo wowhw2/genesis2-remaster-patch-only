@@ -14766,6 +14766,7 @@
     window.addEventListener(종류, function (e) {
       if (!window.__터치마우스) return;
       var T = window.G2터치; if (!T || !T.가상패드 || !T.가상패드() || (T.실패드 && T.실패드())) return;
+      if (T.터치모드 && T.터치모드()) return;   /* 정본 465 — 터치스크린 모드는 가상 패드를 숨긴다(켬 값은 남음) · 손가락이 유일한 조작이라 삼키면 방향을 못 고른다(사장님 11-25 «터치스크린모드에서 이동영역에서 지정하고 방향지정이 안돼. 배치에서는 되는데») */
       if (!(ctrl && ctrl.facingDraft && ctrl.facingDraft())) return;
       e.stopImmediatePropagation(); if (e.cancelable) e.preventDefault();
     }, true);

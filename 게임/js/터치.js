@@ -24,7 +24,16 @@
    *   누르고 있기 = 왼쪽 버튼 누름 유지(원작 대사 «누르고 있으면 빨리» 0x27A25 · 마을 «누른 채 커서 쪽으로 걷기» 0x2E1C8 이 마우스 그대로 된다)
    *   우클릭 = 두 손가락 톡만(길게 누르기 우클릭 뺌) · 오른쪽 옆 상황 단추(메뉴·취소·빨리·진행) · 가상 패드 숨김
    *   이 기기에만 기억(g2.touchmode '1' = 켬) · 게임 설정 «조작 › 터치스크린 모드» */
-  var 터치모드 = false; try { 터치모드 = localStorage.getItem('g2.touchmode') === '1'; } catch (e모) { }
+  /* 정본 466 — «터치스크린 모드» 토글을 «조작 방식» 하나로 합침: 키보드·마우스 / 게임패드 / 터치스크린 (gamepad.js 저장 g2.pad 설정.조작방식)
+   *   사장님 11-25 「그리고 터치스크린모드는 별도 토글이 아니라 조작 방법(키보드마우스, 게임패드, 터치스크린) 이렇게 되어야해」 ·
+   *   「그리고 모바일의 경우 개임패드 모드일때 함께 사용되는게 키보드 마우스가 아니라 터치스크린이면 좋겠고」
+   *   터치모드 = 터치스크린(가상 패드·위 단추 숨김 · 오른쪽 상황 단추) · 손조작 = 손가락이 터치스크린식(게임패드·터치스크린 둘 다) · 키보드·마우스는 예전 손가락=마우스(길게 누름 = 우클릭)
+   *   옛 g2.touchmode '1'(정본 452 토글을 켠 기기)은 한 번만 «터치스크린»으로 옮긴다 */
+  function 조작읽기() { try { return (root.G2Pad && root.G2Pad.불러오기().설정.조작방식) || '게임패드'; } catch (e) { return '게임패드'; } }
+  try { var 옛모드 = localStorage.getItem('g2.touchmode');
+    if (옛모드 === '1' && root.G2Pad) { var 옛P = root.G2Pad.불러오기(); 옛P.설정.조작방식 = '터치스크린'; root.G2Pad.저장(옛P); if (root.G2PadInput && root.G2PadInput.다시읽기) root.G2PadInput.다시읽기(); }
+    if (옛모드 != null && (옛모드 !== '1' || root.G2Pad)) localStorage.removeItem('g2.touchmode'); } catch (e모) { }
+  var 조작 = 조작읽기(), 터치모드 = 조작 === '터치스크린', 손조작 = 조작 !== '키보드·마우스';
   var 누름때 = 200;          /* 이만큼 가만히 누르고 있으면 «누름 유지» — 두 손가락이 마저 닿을 틈 · 짧은 톡은 그대로 클릭 */
   /* [리마스터] 두 손가락 — 맥 터치패드와 같게 (정본 328 · 사장님 11-20 「모바일 기반은 터치를 통한 확대 축소나 이런거 적용해야하지 않아? 맥 터치패드처럼?」 → 고르심 «맥 터치패드와 같게»)
    *   벌리기·오므리기 = 배율(G2공유시점 zoom 10~120 · 30 = 원작 · 패드 우스틱 좌우와 같은 값) · 위아래 끌기 = 3D 기울기(tilt 0~80 · 위로 끌면 커짐 — 우클릭 끌기와 같은 0.25°/px)
@@ -74,11 +83,11 @@
     쏘기('mousemove', t.clientX, t.clientY, 0);
     지금.타이머 = setTimeout(function () {
       if (!지금 || 지금.움직임 || 지금.버림) return;
-      if (터치모드) { 지금.누름 = true; 쏘기('mousedown', 지금.x, 지금.y, 0); return; }   /* 터치스크린 모드 — 누름 유지(떼면 mouseup·click) · 우클릭 아님 */
+      if (손조작) { 지금.누름 = true; 쏘기('mousedown', 지금.x, 지금.y, 0); return; }   /* 터치스크린식(게임패드·터치스크린 · 정본 466) — 누름 유지(떼면 mouseup·click) · 우클릭 아님 */
       지금.오른쪽 = true;
       쏘기('mousedown', 지금.x, 지금.y, 2); 쏘기('mouseup', 지금.x, 지금.y, 2); 쏘기('contextmenu', 지금.x, 지금.y, 2);
       try { if (navigator.vibrate) navigator.vibrate(20); } catch (e진) { }
-    }, 터치모드 ? 누름때 : 길게);
+    }, 손조작 ? 누름때 : 길게);
   }, { passive: false });
 
   document.addEventListener('touchmove', function (e) {
@@ -108,9 +117,9 @@
       return;
     }
     /* 정본 453 — 터치스크린 모드는 문턱을 «처음 누른 자리»부터 잰다: 바로 앞 자리부터 재면 손가락이 잘게(몇 px 씩) 움직일 때 끝까지 14px 를 못 넘어 끌기가 톡이 됐다 */
-    var 문턱자리 = 터치모드 ? { x: 지금.sx, y: 지금.sy } : 지금;
+    var 문턱자리 = 손조작 ? { x: 지금.sx, y: 지금.sy } : 지금;
     if (!지금.움직임 && !지금.누름 && Math.hypot(t.clientX - 문턱자리.x, t.clientY - 문턱자리.y) > 한도 && !지금.오른쪽) {   /* 누름 유지 중이면 이미 눌렸다 — 끌기만 */
-      if (터치모드 && 밀기화면()) {   /* 처음 누른 자리부터 민다 — 문턱만큼 움직인 몫도 버리지 않게 */
+      if (손조작 && 밀기화면()) {   /* 처음 누른 자리부터 민다 — 문턱만큼 움직인 몫도 버리지 않게 */
         지금.밀기 = true; clearTimeout(지금.타이머);
         var 첫곳 = document.elementFromPoint(지금.sx, 지금.sy) || document.body;
         첫곳.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, view: root, clientX: t.clientX, clientY: t.clientY, deltaMode: 0,
@@ -214,7 +223,7 @@
   try {
     navigator.getGamepads = function () {
       var 목 = [].slice.call(원래패드() || []);
-      if (가상켬 && !실패드 && !터치모드) 목.unshift(가상패드);   /* 터치스크린 모드에선 가상 패드 숨김 (정본 452) */                               /* 첫 패드로 — gamepad.js 첫패드() 는 표준 배치의 첫째를 읽는다 */
+      if (가상켬 && !실패드 && 조작 === '게임패드') 목.unshift(가상패드);   /* 가상 패드는 조작 방식 «게임패드»일 때만 (정본 452·466) */                               /* 첫 패드로 — gamepad.js 첫패드() 는 표준 배치의 첫째를 읽는다 */
       return 목;
     };
   } catch (e갈) { }
@@ -312,9 +321,9 @@
   setInterval(실패드보기, 1000);   /* 이벤트를 안 주는 웹뷰가 있다 — 1 초마다 한 번 더 본다 */
   function 칸(판, 단추, 열, 행) { if (단추) { 단추.style.gridColumn = 열; 단추.style.gridRow = 행; 판.appendChild(단추); } }
   function 가상그리기() {
-    if (document.body) { document.body.classList.toggle('가상켬', 가상켬); document.body.classList.toggle('단추숨김', 단추숨김); document.body.classList.toggle('실패드', 실패드); document.body.classList.toggle('터치모드', 터치모드); }
+    if (document.body) { document.body.classList.toggle('가상켬', 가상켬 && 조작 === '게임패드'); document.body.classList.toggle('단추숨김', 단추숨김); document.body.classList.toggle('실패드', 실패드); document.body.classList.toggle('터치모드', 터치모드); }
     var t = document.getElementById('패드켬단추'); if (t) t.classList.toggle('눌림', 가상켬);
-    if (!가상켬) for (var i = 0; i < 17; i++) 버튼(i, false);   /* 끄면 눌린 채 남지 않게 */
+    if (!가상켬 || 조작 !== '게임패드') for (var i = 0; i < 17; i++) 버튼(i, false);   /* 끄면 눌린 채 남지 않게 */
   }
 
   function 단추달기() {
@@ -389,22 +398,24 @@
   setInterval(옆고침, 500);
   /* 처음 켤 때 한 번 — 무엇이 어떻게 바뀌는지 (이 기기에만 기억 g2.touchhint) */
   function 안내() {
-    var 본 = false; try { 본 = localStorage.getItem('g2.touchhint') === '1'; } catch (e) { }
+    var 열쇠 = 터치모드 ? 'g2.touchhint' : 'g2.touchhint.pad', 본 = false; try { 본 = !손조작 || localStorage.getItem(열쇠) === '1'; } catch (e) { }
     if (본 || !document.body || document.getElementById('터치안내')) return;
     var d = document.createElement('div'); d.id = '터치안내';
-    d.textContent = '터치스크린 모드 — 톡 = 클릭 · 누르고 있기 = 계속 누름(대사 빨리 넘기기 · 마을은 그쪽으로 걷기) · 두 손가락 톡 = 우클릭(취소·상태창) · 오른쪽 단추: 메뉴 · 취소 · ▶▶ 빨리 · 진행(전투 시간 진행)';
+    d.textContent = '터치스크린 조작 — 톡 = 클릭 · 누르고 있기 = 계속 누름(대사 빨리 넘기기 · 마을은 그쪽으로 걷기) · 두 손가락 톡 = 우클릭(취소·상태창) · 전투·월드는 끌면 맵 이동' +
+      (터치모드 ? ' · 오른쪽 단추: 메뉴 · 취소 · ▶▶ 빨리 · 진행(전투 시간 진행)' : '');   /* 정본 466 — 게임패드 조작에서도 손가락이 터치스크린식이라 한 번 알린다(길게 누름 우클릭이 없어짐) */
     document.body.appendChild(d);
-    var 닫 = function () { if (d.parentNode) d.parentNode.removeChild(d); try { localStorage.setItem('g2.touchhint', '1'); } catch (e) { } };
+    var 닫 = function () { if (d.parentNode) d.parentNode.removeChild(d); try { localStorage.setItem(열쇠, '1'); } catch (e) { } };
     d.addEventListener('touchstart', function (e) { e.stopPropagation(); 닫(); }, { passive: true });
     setTimeout(닫, 9000);
   }
-  function 터치모드바꾸기(v) {
-    터치모드 = !!v; try { localStorage.setItem('g2.touchmode', 터치모드 ? '1' : '0'); } catch (e) { }
+  function 조작바꾸기(v) {   /* 정본 466 — 게임 설정 «조작 방식»이 부른다(저장은 게임 설정이 g2.pad 에) */
+    조작 = String(v); 터치모드 = 조작 === '터치스크린'; 손조작 = 조작 !== '키보드·마우스';
     if (지금) { clearTimeout(지금.타이머); if (지금.누름) 쏘기('mouseup', 지금.x, 지금.y, 0); 지금 = null; }
-    if (터치모드) { for (var i = 0; i < 17; i++) 버튼(i, false); 안내(); }
+    if (조작 !== '게임패드') for (var i = 0; i < 17; i++) 버튼(i, false);
+    안내();
     가상그리기(); 옆고침();
   }
-  if (터치모드) setTimeout(안내, 1500);
+  if (손조작) setTimeout(안내, 1500);
   if (document.body) 단추달기(); else document.addEventListener('DOMContentLoaded', 단추달기);
   /* 게임 «종료»(EXIT) — 모바일 앱은 특별 주소로 앱 본체(MainActivity 의 G2앱창구)에 알려 앱을 닫는다 (데스크톱 G2앱.종료 와 같은 자리) */
   /* 정본 343 — 아이폰 본체는 g2app://exit 를 가로채지 않아 «종료하기»에서 멈췄다(아이패드 신고 11-20 · 사장님 「실행기 첫화면으로 돌아가면 안돼 종료되어야지」)
@@ -418,7 +429,8 @@
   root.G2터치 = { 켜짐: true, ESC: function () { 키('Escape'); },
     /* 게임 설정(game_settings.js «조작»)이 읽고 쓴다 — 인자 없이 부르면 지금 값 (정본 381) */
     가상패드: function (v) { if (v != null) { 가상켬 = !!v; try { localStorage.setItem('g2.vpad', 가상켬 ? '1' : '0'); } catch (e) { } 가상그리기(); } return 가상켬; },
-    터치모드: function (v) { if (v != null) 터치모드바꾸기(v); return 터치모드; },   /* 정본 452 — 게임 설정 «조작 › 터치스크린 모드» */
+    터치모드: function () { return 터치모드; },   /* 정본 452·466 — 조작 방식이 «터치스크린»인가(가상 패드 숨김) · battle_main 정본 465 가 본다 */
+    조작방식: function (v) { if (v != null) 조작바꾸기(v); return 조작; },   /* 정본 466 — 게임 설정 «조작 › 조작 방식» */
     단추보이기: function (v) { if (v != null) { 단추숨김 = !v; try { localStorage.setItem('g2.touchbtn', 단추숨김 ? '0' : '1'); } catch (e) { } 가상그리기(); } return !단추숨김; },
     실패드: function () { 실패드보기(); return 실패드; } };   /* ESC — 안드로이드 «뒤로»도 이것을 부른다(MainActivity) */
 })(typeof window !== 'undefined' ? window : this);
