@@ -59,7 +59,7 @@
       (document.activeElement || document.body).dispatchEvent(ev);
     });
   }
-  function 가운데로() { 쏘기('mousemove', innerWidth / 2, innerHeight / 2, 0); }
+  function 가운데로() { root.__터치가운데 = true; try { 쏘기('mousemove', innerWidth / 2, innerHeight / 2, 0); } finally { root.__터치가운데 = false; } }   /* 정본 467 — 받는 쪽이 «손 뗀 뒤 가운데로»를 안다(방향 고르기는 이것으로 방향을 바꾸지 않는다) */
   /* 정본 453 — 끌어서 맵 밀기를 하는 화면: 전투·월드 (캐릭터 창 STATUS·EQUIP 은 다른 화면이라 아이템 끌기는 그대로) */
   function 밀기화면() { try { var c = root.__셸 && root.__셸.현재 && root.__셸.현재(), n = c ? (c.화면 || c.이름) : null; return n === 'BATTLE' || n === 'WORLD'; } catch (e) { return false; } }
 
@@ -430,7 +430,8 @@
     /* 게임 설정(game_settings.js «조작»)이 읽고 쓴다 — 인자 없이 부르면 지금 값 (정본 381) */
     가상패드: function (v) { if (v != null) { 가상켬 = !!v; try { localStorage.setItem('g2.vpad', 가상켬 ? '1' : '0'); } catch (e) { } 가상그리기(); } return 가상켬; },
     터치모드: function () { return 터치모드; },   /* 정본 452·466 — 조작 방식이 «터치스크린»인가(가상 패드 숨김) · battle_main 정본 465 가 본다 */
-    조작방식: function (v) { if (v != null) 조작바꾸기(v); return 조작; },   /* 정본 466 — 게임 설정 «조작 › 조작 방식» */
+    조작방식: function (v) { if (v != null) 조작바꾸기(v); return 조작; },
+    손조작: function () { return 손조작; },   /* 정본 467 — 손가락이 터치스크린식인가(게임패드·터치스크린) · 방향 고르기 네 화살표가 본다 */   /* 정본 466 — 게임 설정 «조작 › 조작 방식» */
     단추보이기: function (v) { if (v != null) { 단추숨김 = !v; try { localStorage.setItem('g2.touchbtn', 단추숨김 ? '0' : '1'); } catch (e) { } 가상그리기(); } return !단추숨김; },
     실패드: function () { 실패드보기(); return 실패드; } };   /* ESC — 안드로이드 «뒤로»도 이것을 부른다(MainActivity) */
 })(typeof window !== 'undefined' ? window : this);

@@ -14459,6 +14459,25 @@
     }
     return true;
   }
+  /* [리마스터] 정본 467 — 휴대폰 손가락 방향 고르기 (사장님 11-25 「배치나 이동시 방향지정에서 화살표 방향이 현재는 보이지 않는 마우스 위치에 따라 표시되어 보기 좋지 않아. 칸 기준으로 터치하는 부분에 따라 잠시 보여주고 방향을 지정하라는 시각적 신호가 필요해. 예를들면 모든 방향 화살표가 나오고 터치한 위치에 따라 지정된 방향 화살표만 한번 더 보여준다거나」)
+   *   G2손방향() — 손가락이 터치스크린식(터치.js 손조작)이고 지금 손가락·패드로 조작 중(진짜 마우스를 움직이면 __패드커서숨김 이 풀려 원작 화살표로)
+   *   render facingGuide 가 이것을 보고 네 방향을 붙박아 그린다 · 손을 뗀 뒤 «가운데로»(터치.js __터치가운데)는 방향을 안 바꾼다
+   *   톡해서 정할 때는 고른 쪽 화살표만 크게 0.35초 보여 준 뒤 정한다(그동안 다른 톡·움직임은 버림) */
+  window.G2손방향 = function () { var T = window.G2터치; return !!(T && T.손조작 && T.손조작() && window.__패드커서숨김); };
+  var 손확정중 = false;
+  function 손확정늦춤(draft, 다음) {
+    손확정중 = true; draft.확정보임 = true;
+    try { R.facingGuide(draft); R.apply(); } catch (e1) { }
+    setTimeout(function () {
+      손확정중 = false; draft.확정보임 = false;
+      try { 다음(); } finally {
+        var 남 = (battle && battle.배치방향) || (ctrl.facingDraft && ctrl.facingDraft());   /* 설 수 없어 안 정해졌으면 네 방향으로 되돌려 그림 */
+        if (남) { try { R.facingGuide(남); R.apply(); } catch (e2) { } }
+      }
+    }, 350);
+  }
+  window.G2손확정중 = function () { return 손확정중; };
+
   /** 마우스 오프셋(칸 중심 기준) → 방향. 이동과 같은 원본 규칙 `0x163EB`. */
   function 배치방향계산(clientX, clientY, tx, ty) {
     var q = pixelUnder(clientX, clientY);
@@ -14505,6 +14524,12 @@
     /* ── ② 방향을 고르는 중이면 이번 클릭이 **확정**이다 ── */
     var f = battle.배치방향;
     if (f) {
+      if (손확정중 && !e._손늦춤) return true;   /* 정본 467 — 보여 주는 동안 다른 톡은 버림 */
+      if (window.__터치마우스 && window.G2손방향() && !e._손늦춤) {
+        var 재 = { clientX: e.clientX, clientY: e.clientY, _손늦춤: true };
+        손확정늦춤(f, function () { if (battle.배치방향 === f) 배치타일클릭(재); });
+        return true;
+      }
       /* ★ 원본 `0x5545D call 0x165C2` — 설 수 없으면 **확정하지 않고** 방향을 계속 고른다
        *   (`0x55465 je 0x55387` 이 재선택 루프로 돌아간다) */
       if (!배치설수있나(m, f.x, f.y, f.facing)) {
@@ -14703,6 +14728,8 @@
     }
     if (G2Ring.isOpen() && ringMode()) return;       /* 실제 링 입력 상태에서만 멈춥니다 */
 
+    /* 정본 467 — 손 뗀 뒤 «가운데로»·톡해서 정하는 동안은 방향을 바꾸지 않는다(보이지 않는 마우스) */
+    if ((window.__터치가운데 || 손확정중) && ((battle && battle.배치방향) || ctrl.facingDraft())) return;
     /* ★ 배치 방향 선택 중 — 이동과 같은 규칙으로 화살표를 돌린다 (2026-08-25) */
     if (battle && battle.배치방향) { 배치방향갱신(e); return; }
 
@@ -14746,6 +14773,14 @@
     /* ★ 스테이터스 창의 장비 칸은 **끌어놓기**다 — 누를 때 집고 뗄 때 놓는다
      *   (사용자 2026-08-14: 「아이템 이동은 드래그 앤 드롭으로 적용돼」).
      *   그 밖의 상태에서는 예전처럼 누르는 순간 한 번만 처리한다. */
+    if (ctrl.facingDraft()) {   /* 정본 467 — ���가락이면 고른 쪽 화살표를 잠깐 보여 준 뒤 정한다 */
+      if (손확정중) return;
+      if (window.__터치마우스 && window.G2손방향()) {
+        var fd손 = ctrl.facingDraft();
+        손확정늦춤(fd손, function () { if (ctrl.facingDraft() === fd손) ctrl.input({ type: 'click', x: t.x, y: t.y, lx: lg.x, ly: lg.y, press: true }); });
+        return;
+      }
+    }
     ctrl.input({ type: 'click', x: t.x, y: t.y, lx: lg.x, ly: lg.y, press: true });
   });
   /* 뗄 때 — 장비를 끌고 있었으면 그 자리에 놓는다 */
@@ -14768,6 +14803,9 @@
       var T = window.G2터치; if (!T || !T.가상패드 || !T.가상패드() || (T.실패드 && T.실패드())) return;
       if (T.터치모드 && T.터치모드()) return;   /* 정본 465 — 터치스크린 모드는 가상 패드를 숨긴다(켬 값은 남음) · 손가락이 유일한 조작이라 삼키면 방향을 못 고른다(사장님 11-25 «터치스크린모드에서 이동영역에서 지정하고 방향지정이 안돼. 배치에서는 되는데») */
       if (!(ctrl && ctrl.facingDraft && ctrl.facingDraft())) return;
+      /* 정본 467 — 목적지 칸 둘레(네 방향 화살표 자리)를 톡한 것은 통과 — 방향을 손가락으로 고른다 · 멀리 스친 손가락(패드 쥔 엄지)만 지금처럼 삼킨다 */
+      try { var 상 = R.facingBoxEl && R.facingBoxEl.getBoundingClientRect(); if (상 && 상.width) { var 반 = Math.max(상.width, 상.height) * 1.6;
+        if (Math.abs(e.clientX - (상.left + 상.width / 2)) <= 반 && Math.abs(e.clientY - (상.top + 상.height / 2)) <= 반) return; } } catch (e근) { }
       e.stopImmediatePropagation(); if (e.cancelable) e.preventDefault();
     }, true);
   });

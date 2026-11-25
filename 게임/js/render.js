@@ -9647,6 +9647,19 @@ function 방향화살미리굽기(r) {
   [0, 2, 4, 6].forEach(function (f) { if (r.MOVECUR[f]) { try { S.sheet(r.MOVECUR[f]); } catch (e) { } } });
 }
 
+/* 정본 467 — 화살표 한 장에 MOVE.CUR 그림을 입힌다(스케일러 sheet · 아래 facingGuide 와 같은 길) · 그림이 아직 없으면 false */
+Renderer.prototype._화살그림 = function (a, frame) {
+  var url = this.MOVECUR && this.MOVECUR[frame];
+  if (!url) return false;
+  if (root.G2Scaler && root.G2Scaler.sheet) {
+    var 원 = url;
+    url = root.G2Scaler.sheet(원, function () { if (a.dataset.원 === 원) a.style.backgroundImage = 'url(' + root.G2Scaler.sheet(원) + ')'; });
+    a.dataset.원 = 원; a.style.imageRendering = rend();
+  }
+  a.style.backgroundImage = 'url(' + url + ')';
+  return true;
+};
+
 /* 이동 목적지 방향 확정 UI — 목적지 위 네모와 네 방향 화살표. */
 Renderer.prototype.facingGuide = function (draft) {
   방향화살미리굽기(this);
@@ -9663,11 +9676,32 @@ Renderer.prototype.facingGuide = function (draft) {
     this.facingArrowEl.style.cssText =
       'position:absolute;width:17px;height:17px;image-rendering:pixelated;' +
       'background-position:center;background-size:17px 17px;background-repeat:no-repeat;';
+    /* [리마스터] 정본 467 — 휴대폰 손가락: 네 방향 화살표를 칸 둘레에 붙박아 «방향을 고르라»는 신호 (차례 남·서·북·동) */
+    this.facingArrowEls = [0, 1, 2, 3].map(function () {
+      var e = el('span', '', this.facingBoxEl);
+      e.style.cssText = this.facingArrowEl.style.cssText + 'display:none;transition:opacity 0.12s,transform 0.12s;';
+      return e;
+    }, this);
   }
   var b = this.facingBoxEl;
   if (!draft) { b.style.display = 'none'; return this; }
   b.style.display = '';
   var a = this.facingArrowEl, d = draft.facing & 3;
+  /* [리마스터] 정본 467 — 휴대폰 손가락 조작이면 보이지 않는 마우스를 따라가는 화살표 하나 대신 네 방향을 붙박아 그린다
+   *   (사장님 11-25 「배치나 이동시 방향지정에서 화살표 방향이 현재는 보이지 않는 마우스 위치에 따라 표시되어 보기 좋지 않아. 칸 기준으로 터치하는 부분에 따라 잠시 보여주고 방향을 지정하라는 시각적 신호가 필요해. 예를들면 모든 방향 화살표가 나오고 터치한 위치에 따라 지정된 방향 화살표만 한번 더 보여준다거나」)
+   *   고른 쪽은 진하게 · 나머지는 흐리게 · 톡해서 정하는 순간(draft.확정보임)은 고른 쪽만 크게 — battle_main 이 잠깐 두었다가 정한다 · 마우스·PC 는 원작 그대로 */
+  var 손 = !!(root.G2손방향 && root.G2손방향());
+  var self = this;
+  this.facingArrowEls.forEach(function (e, k) {
+    if (!손 || (draft.확정보임 && k !== d)) { e.style.display = 'none'; return; }
+    var 자리 = [[13, 25], [-8, 9], [13, -7], [34, 9]][k];   /* 남·서·북·동 — 상자 26×18 둘레(여유 9 안) */
+    e.style.left = (자리[0] - 8) + 'px'; e.style.top = (자리[1] - 8) + 'px';
+    e.style.opacity = k === d ? '1' : '0.4';
+    e.style.transform = draft.확정보임 ? 'scale(1.35)' : '';
+    e.style.display = self._화살그림(e, [0, 2, 4, 6][k]) ? '' : 'none';
+  });
+  if (손) a.style.display = 'none';
+  if (손) { b._ground = null; b.style.transformOrigin = '50% 50%'; b.style.left = (draft.x * TW - 1 - this.mapW / 2) + 'px'; b.style.top = (draft.y * TH - 1 - this.mapH / 2) + 'px'; b.style.transform = 'none'; return this; }   /* 상자 자리는 아래와 같은 식 */
   var p = draft.pointer || { x: 0, y: 0 };
   var clamp = function (v, lo, hi) { return Math.max(lo, Math.min(hi, v)); };
   var px = p.x | 0, py = p.y | 0, M = 9;   // M = 박스 밖 여유(정사각 영역)
