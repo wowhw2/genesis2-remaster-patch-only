@@ -275,6 +275,20 @@
      *   (맥 시뮬레이터 아이패드 1-7 3D 가만히: texImage2D 5초 66번 1199ms · 사장님 11-20 「느린거 해결해야해. 지금 오딘3(안드로이드)도 느리다고 피드백이 왔어」) */
     ['그리기', '크기', '표식그리기'].forEach(function (k) { var f = 장면 && 장면[k]; if (typeof f === 'function') 장면[k] = function () { 장면.판번호 = (장면.판번호 | 0) + 1; return f.apply(this, arguments); }; });
     var 가림 = root.G2지정본그리기.만들기(환경(cv2, true));
+    /* 정본 475 — 3D 장면·가림판의 WebGL 문맥을 잃으면(휴대폰 그래픽 메모리 모자람) 이 전투는 3D 를 걷고 2D(원래 맵 층)로 보인다
+     *   ☠ 전에는 잃은 캔버스가 그대로 남아 맵이 통째로 사라진 채 돌아오지 않았다
+     *     (사장님 11-25 「외눈의 용병 첫 전투에서 아군 링커맨드 열면 이런화면이 나와. 맵 북쪽에 있을떄야.」 · 사진: 분홍 바탕에 링·숫자만 ·
+     *      측정 창 9-3 에서 3D 장면 문맥을 일부러 잃게 하자 맵이 빈 채 남음)
+     *   걷기(판정리)가 일부러 loseContext 를 부를 때도 이 사건이 오므로 «지금 3D 의 그 캔버스»일 때만 · 다음 맵에서는 맵준비가 새 문맥으로 다시 깐다 */
+    [cv, cv2].forEach(function (c) {
+      c.addEventListener('webglcontextlost', function () {
+        var s = R._리마스터3D;
+        if (!s || (s.캔버스 !== c && s.가림캔버스 !== c)) return;
+        root.__리마스터3D잃음 = (root.__리마스터3D잃음 | 0) + 1;
+        try { console.warn('[3D] ' + (c === cv ? '장면' : '가림판') + ' 그래픽 문맥을 잃었다 — 이 전투는 2D 로 (' + s.이름 + ')'); } catch (e로) { }
+        setTimeout(function () { if (R._리마스터3D !== s) return; try { 걷기(R); R.apply(); } catch (e걷) { } }, 0);
+      }, false);
+    });
     return { 캔버스: cv, 장면: 장면, 가림캔버스: cv2, 가림: 가림 };
   }
 
