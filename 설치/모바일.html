@@ -307,6 +307,8 @@ function 설치됨화면(s) {
   $('버전줄').title = '창세기전 2 원본 : ' + 이름(r.CD || r.창2) + '\n창세기전 1 원본 : ' + 이름(r.창1);
   $('바로시작').focus();
   $('cue줄').hidden = !s.cue없음;   /* 정본 410 — cue 가 없으면 안내 · 연결 단추 */
+  /* 정본 470 — cue 는 있는데 음악 트랙을 못 읽으면(꼴이 다르거나 이미지와 안 맞음) 그렇다고 알리고 같은 단추로 다시 연결 */
+  if (s.cue없음 && s.cue까닭 === '못읽음') $('cue말').innerHTML = '지금 있는 <b>.cue</b> 파일로는 배경음악 트랙을 읽지 못했습니다 — 창세기전 2 원본의 <b>GENESIS2.cue</b> 를 연결해 주세요.';
   패치살피기();
   /* 정본 371 — 지난번 튕김 기록을 보냈으면 한 줄 (본체가 켜진 뒤 3초쯤에 보낸다 — 6초 뒤 한 번 더) */
   var 튕김줄 = function () { 상태().then(function (x) { var e = $('설치됨말'); if (x && x.튕김알림 && e.textContent.indexOf(x.튕김알림) < 0) { e.textContent = x.튕김알림; e.hidden = false; } }).catch(function () { }); };

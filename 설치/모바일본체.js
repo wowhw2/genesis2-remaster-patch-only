@@ -119,8 +119,10 @@ function cue살피기(r, 찾) {
   if (!폴더) return { 없음: false, 폴더: null };
   let 이름들 = []; try { 이름들 = fs.readdirSync(폴더); } catch (e) { return { 없음: false, 폴더 }; }
   const 이미지 = 이름들.some(n => { if (!/\.(bin|img)$/i.test(n)) return false; const k = 이미지종류(path.join(폴더, n)); return k ? k === '창2' : !/창1|GENESIS1|창세기전1/i.test(n.normalize('NFC')); });   /* 정본 427 — 안을 보고 · 못 열면 이름 */
-  const 큐 = 이름들.some(n => /\.cue$/i.test(n));
-  return { 없음: 이미지 && !큐, 폴더 };
+  const 큐들 = 이름들.filter(n => /\.cue$/i.test(n));
+  /* 정본 470 — cue 가 있어도 음악 트랙을 못 읽으면(꼴이 다르거나 이미지와 안 맞음) «없음»과 같게 연결 단추를 보인다 · 까닭으로 안내 글을 가른다 */
+  const 씀 = 큐들.some(n => 큐쓸수있나(path.join(폴더, n)) > 0);
+  return { 없음: 이미지 && !씀, 까닭: 이미지 && !씀 ? (큐들.length ? '못읽음' : '없음') : null, 큐: 큐들.map(n => n.normalize('NFC')), 폴더 };
 }
 /* ── 원본 파일 찾기 — 올린 것 + 바깥 앱 폴더 ── */
 function 파일들(d) { try { return fs.readdirSync(d).map(n => path.join(d, n)).filter(p => fs.statSync(p).isFile()); } catch (e) { return []; } }
@@ -215,6 +217,26 @@ function 서버기록붙잡기() {
  *   서버 sendCdTrack·wavHeader 와 같은 꼴(44바이트 PCM WAV 머리 · Range) */
 const CD_칸 = 2352, CD_빈도 = 44100;
 let 본체CD기억 = null;
+/* 정본 470 — cue 글 → 트랙표 { 번호: { type, start } } · 번호·INDEX 를 0 없이(«TRACK 1» · «INDEX 1») 써도 읽는다
+ *   신고 버그신고_휴대폰_20261124_234450·20261125_030746(아이패드 · img·ccd·cue·sub · 「창2 원본이미지 cue인식 불가」·「애플기기 모바일에서 cue만 연결이 보이지 않음」):
+ *   진단 cue 풀이 «트랙 19 · 음악 18» 인데 데이터 트랙 모드가 비어(설치엔진 «TRACK 01 MODE1/2352» 꼴이 아님) 본체·서버 모두 «CD 없음» → /CD 404 */
+function 큐트랙(글) {
+  const 트랙 = {}; let 지금 = null;
+  for (const 줄 of String(글).split(/\r?\n/)) {
+    let m = 줄.match(/TRACK\s+(\d+)\s+(\S+)/i); if (m) { 지금 = { no: +m[1], type: m[2].toUpperCase() }; continue; }
+    m = 줄.match(/INDEX\s+0*1\s+(\d+):(\d+):(\d+)/i);
+    if (m && 지금) { 트랙[지금.no] = { type: 지금.type, start: ((+m[1] * 60 + +m[2]) * 75 + +m[3]) * CD_칸 }; 지금 = null; }
+  }
+  return 트랙;
+}
+/* 정본 470 — 이 cue 로 배경음 트랙을 낼 수 있나: 이미지가 있고 음악 트랙 수 · cue없음 안내와 본체CD표가 같은 눈으로 본다 */
+function 큐쓸수있나(cue) {
+  let 큐읽기 = null; try { 큐읽기 = require(path.join(게임폴더, '설치엔진.js')).큐읽기; } catch (e) { }
+  try {
+    const c = 큐읽기 ? 큐읽기(cue) : null; if (!c || !c.bin || /\.iso$/i.test(c.bin) || !fs.existsSync(c.bin)) return 0;
+    const 트 = 큐트랙(fs.readFileSync(cue, 'latin1')); return Object.keys(트).filter(k => 트[k].type === 'AUDIO').length;
+  } catch (e) { return 0; }
+}
 function 본체CD표() {
   const r = 기록읽기();
   const 폴더들 = [];
@@ -231,12 +253,7 @@ function 본체CD표() {
         const c = 큐읽기 ? 큐읽기(cue) : null; if (!c || !c.bin || /\.iso$/i.test(c.bin)) continue;
         const 크기 = fs.statSync(c.bin).size, 열쇠 = cue + '|' + fs.statSync(cue).mtimeMs + '|' + c.bin + '|' + 크기;
         if (본체CD기억 && 본체CD기억.열쇠 === 열쇠) return 본체CD기억;
-        const 트랙 = {}; let 지금 = null;
-        for (const 줄 of fs.readFileSync(cue, 'latin1').split(/\r?\n/)) {
-          let m = 줄.match(/TRACK\s+(\d+)\s+(\S+)/i); if (m) { 지금 = { no: +m[1], type: m[2].toUpperCase() }; continue; }
-          m = 줄.match(/INDEX\s+01\s+(\d+):(\d+):(\d+)/i);
-          if (m && 지금) { 트랙[지금.no] = { type: 지금.type, start: ((+m[1] * 60 + +m[2]) * 75 + +m[3]) * CD_칸 }; 지금 = null; }
-        }
+        const 트랙 = 큐트랙(fs.readFileSync(cue, 'latin1'));   /* 정본 470 */
         const 번호 = Object.keys(트랙).map(Number).sort((a, b) => a - b); if (!번호.length) continue;
         번호.forEach((k, i) => { 트랙[k].end = (i + 1 < 번호.length) ? 트랙[번호[i + 1]].start : 크기; });
         본체CD기억 = { 열쇠, bin: c.bin, 트랙 };
@@ -377,12 +394,29 @@ function zip묶기(목록) {
   return Buffer.concat([...앞, 중앙b, 끝]);
 }
 let 튕김알림 = '';
+/* 정본 474 — 글 한 덩이를 POST 하고 답 번호만 (넘기는 답 302 는 따라가지 않는다 — 아래 «보냈음» 규칙)
+ *   ☠ 전에는 fetch 를 썼는데 아이폰·아이패드 node(v18 · JIT 없음)는 fetch 속 undici 가 WebAssembly 를 못 써
+ *     «[본체 약속 오류] ReferenceError: WebAssembly is not defined (lazyllhttp)» 로 실패 → 아이폰 튕김 기록이 한 번도 안 갔다
+ *     (신고 버그신고_휴대폰_20261125_030746 튕김기록 · 켤 때마다 같은 줄 — 그 줄이 다시 «보낼 기록»이 되어 되풀이)
+ *   ⇒ node 기본 https 로 (안드로이드·PC 시험도 같은 길) */
+function 글보내기(주소, 몸, 시간) {
+  return new Promise((되, 안) => {
+    let u; try { u = new URL(주소); } catch (e) { return 안(e); }
+    const 몸바이트 = Buffer.from(몸, 'utf8');
+    const 모듈 = u.protocol === 'http:' ? http : require('https');
+    const 요청 = 모듈.request(u, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8', 'Content-Length': 몸바이트.length } }, (답) => {
+      답.resume(); 답.on('end', () => 되(답.statusCode | 0)); 답.on('error', () => 되(답.statusCode | 0));
+    });
+    요청.setTimeout(시간 || 30000, () => { 요청.destroy(new Error('시간 넘음')); });
+    요청.on('error', 안);
+    요청.end(몸바이트);
+  });
+}
 async function 튕김보내기() {
   let 글 = ''; try { 글 = fs.readFileSync(튕김파일, 'utf8'); } catch (e) { return; }
   let 보낸 = 0; try { 보낸 = JSON.parse(fs.readFileSync(튕김보냄파일, 'utf8')).자리 | 0; } catch (e) { }
   const 새 = 글.slice(보낸 > 글.length ? 0 : 보낸);
   if (!새.split('\n').some(l => /\[(튕김|본체 오류|본체 약속 오류)\]/.test(l))) return;   /* 끔·기록 없이 꺼짐·화면 오류만으로는 보내지 않는다 */
-  if (typeof fetch !== 'function') return;
   const 때 = new Date(), 붙 = n => String(n).padStart(2, '0');
   const 이름 = '튕김기록_휴대폰_' + 때.getFullYear() + 붙(때.getMonth() + 1) + 붙(때.getDate()) + '_' + 붙(때.getHours()) + 붙(때.getMinutes()) + 붙(때.getSeconds()) + '.zip';
   const 설명 = '[튕김 기록 자동] 휴대폰 ' + process.platform + ' · 본체 ' + (process.env.G2M_본체 || '?');
@@ -394,8 +428,8 @@ async function 튕김보내기() {
   try {
     /* 구글 Apps Script 는 받은 뒤 302 로 결과 주소에 넘긴다 — Node 가 그것을 따라가다 실패로 보면 «보냈음»을 못 적어 다음에 또 보냈다(11-22 PC 시험)
      *   ⇒ 넘기는 답을 따라가지 않고 2xx·3xx 면 받은 것으로 본다 */
-    const res = await fetch(휴대폰신고주소, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ 이름, 설명, zip: zip.toString('base64') }) });
-    if (res.status >= 200 && res.status < 400) 튕김알림 = '지난번 튕김 기록을 개발자에게 보냈습니다(오류 기록 글만 · 세이브·화면은 보내지 않습니다).';
+    const 상태 = await 글보내기(휴대폰신고주소, JSON.stringify({ 이름, 설명, zip: zip.toString('base64') }));
+    if (상태 >= 200 && 상태 < 400) 튕김알림 = '지난번 튕김 기록을 개발자에게 보냈습니다(오류 기록 글만 · 세이브·화면은 보내지 않습니다).';
     else 되돌리기();
   } catch (e) { 되돌리기(); }
 }
@@ -448,7 +482,7 @@ http.createServer(async (req, res) => {
         try {
           const 이름들 = fs.readdirSync(d); o.있음 = true;
           o.파일 = 이름들.slice(0, 40).map(n => { let 크기 = -1, 폴더 = false; try { const st = fs.statSync(path.join(d, n)); 크기 = st.size; 폴더 = st.isDirectory(); } catch (e) { } return n.normalize('NFC') + (폴더 ? '/' : ' ' + 크기); });
-          o.큐 = 이름들.filter(n => /\.cue$/i.test(n)).map(n => { try { const t = fs.readFileSync(path.join(d, n), 'latin1'); const m = /FILE\s+"([^"]+)"/i.exec(t); return n.normalize('NFC') + ' → FILE ' + (m ? Buffer.from(m[1], 'latin1').toString('utf8') : '없음') + ' · 트랙 ' + (t.match(/TRACK\s+\d+/gi) || []).length + ' · 음악 ' + (t.match(/TRACK\s+\d+\s+AUDIO/gi) || []).length; } catch (e) { return n + ' 못 읽음'; } });
+          o.큐 = 이름들.filter(n => /\.cue$/i.test(n)).map(n => { try { const t = fs.readFileSync(path.join(d, n), 'latin1'); const m = /FILE\s+"([^"]+)"/i.exec(t); return n.normalize('NFC') + ' → FILE ' + (m ? Buffer.from(m[1], 'latin1').toString('utf8') : '없음') + ' · 트랙 ' + (t.match(/TRACK\s+\d+/gi) || []).length + ' · 음악 ' + (t.match(/TRACK\s+\d+\s+AUDIO/gi) || []).length + ' · 본체가 읽은 음악 ' + 큐쓸수있나(path.join(d, n)) + (t.length <= 4000 ? ' · 글 ' + JSON.stringify(t) : ''); }   /* 정본 470 — 다음 신고에서 cue 꼴을 바로 본다(작은 글 · 개인 정보 없음) */ catch (e) { return n + ' 못 읽음'; } });
         } catch (e) { o.오류 = e.code || e.message; }
         본[d] = o;
       }
@@ -468,7 +502,7 @@ http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
       return res.end(JSON.stringify({ 기록: { CD폴더: r.CD폴더, CD: r.CD, 창2: r.창2 }, 데이터: 데이터, 폴더: 본, 설정글, 큐풀이, 서버줄, 게임켬 }));
     }
-    if (p === '/state') { const r = 기록읽기(), 찾 = 원본찾기(); return 제이슨(res, { 기록: r, 설치됨: !!(r && 창2폴더인가(r.창2) && r.창1), 찾음: 찾, 진행, 설치중, 설치오류, 바깥폴더: 바깥폴더후보[0], 튕김알림, cue없음: cue살피기(r, 찾).없음 }); }
+    if (p === '/state') { const r = 기록읽기(), 찾 = 원본찾기(); return 제이슨(res, { 기록: r, 설치됨: !!(r && 창2폴더인가(r.창2) && r.창1), 찾음: 찾, 진행, 설치중, 설치오류, 바깥폴더: 바깥폴더후보[0], 튕김알림, cue없음: cue살피기(r, 찾).없음, cue까닭: cue살피기(r, 찾).까닭 }); }   /* 정본 470 — '없음' | '못읽음' */
     if (p === '/reinstall' && req.method === 'POST') {   /* 정본 310 — 첫 화면 «다시 설치» */
       if (설치중 || 게임켬) return 제이슨(res, { 오류: 설치중 ? '설치 중입니다' : '게임이 이미 시작됐습니다 — 앱을 다시 켠 뒤 첫 화면에서 고르세요' }, 409);
       설치오류 = null; 진행 = { 단계: '', 지금: 0, 전체: 0, 이름: '' };
