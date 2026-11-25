@@ -9694,9 +9694,9 @@ Renderer.prototype.facingGuide = function (draft) {
   var self = this;
   this.facingArrowEls.forEach(function (e, k) {
     if (!손 || (draft.확정보임 && k !== d)) { e.style.display = 'none'; return; }
-    var 자리 = [[13, 25], [-8, 9], [13, -7], [34, 9]][k];   /* 남·서·북·동 — 상자 26×18 둘레(여유 9 안) */
+    var 자리 = [[13, 27], [-10, 9], [13, -10], [35, 9]][k];   /* 남·서·북·동 — 상자 26×18 바깥 1px 에 똑같이(그림 17px = 가운데 −8 ~ +9) · 사장님 11-25 「남쪽 화살표의 위치는 문제 없어? 다른 화살표들은 엄밀히 말하면 선택 박스 바깥쪽 아니야?」 — 전엔 북 2·서 1·남 1px 들어오고 동은 딱 바깥 */
     e.style.left = (자리[0] - 8) + 'px'; e.style.top = (자리[1] - 8) + 'px';
-    e.style.opacity = k === d ? '1' : '0.4';
+    e.style.opacity = '1'; e.style.filter = k === d ? '' : 'brightness(0.45) saturate(0.5)';   /* 고르지 않은 쪽은 어둡게 — 비치게(투명도) 그리면 밑 유닛 그림이 보여 «유닛에 가린 듯» 보였다 (사장님 11-25 「이 화살표는 유닛에 가려지지 않게 위로 그리면 좋겠어.」 · 층은 원래 유닛 위 g2-overlay) */
     e.style.transform = draft.확정보임 ? 'scale(1.35)' : '';
     e.style.display = self._화살그림(e, [0, 2, 4, 6][k]) ? '' : 'none';
   });
@@ -12051,7 +12051,9 @@ Renderer.prototype.screenOfRendered = function (u, dx, dy) {
   this._빌보드놓기(probe, lx, gy, 0);
   this._빌보드적용(probe);
 
-  var r = probe.getBoundingClientRect();
+  /* 정본 456 2단계 — 스위치(window.__유닛GPU재기)가 켜지면 재는 점 자리를 계산식으로(유닛GPU층.js · 못 풀면 옛 길) */
+  var GP = root.G2유닛GPU층, r = (GP && GP.쓸까 && GP.쓸까(this)) ? GP.화면사각(probe, this) : null;
+  if (!r) r = probe.getBoundingClientRect();
   return { x: (r.left - h.left) * 320 / h.width,
            y: (r.top - h.top) * 200 / h.height };
 };
@@ -14270,9 +14272,11 @@ Renderer.prototype.유닛불투명픽셀인가 = function (u, clientX, clientY) 
   if (!box || box.style.display === 'none') return false;
   var L = box._layers || [];
   var boxed = false;
+  /* 정본 456 2단계 — 스위치가 켜지면 층 사각을 계산식으로(host 자리만 한 번 잼 · 못 풀면 옛 길) */
+  var GP = root.G2유닛GPU층, 새 = !!(GP && GP.쓸까 && GP.쓸까(this)), 호 = 새 ? this.host.getBoundingClientRect() : null;
   for (var i = L.length - 1; i >= 0; i--) {
     var e = L[i].el, m = L[i].meta;
-    var r = e.getBoundingClientRect();
+    var r = (새 && GP.화면사각(e, this, 호)) || e.getBoundingClientRect();
     if (!r.width || !r.height) continue;
     if (clientX < r.left || clientX >= r.right ||
         clientY < r.top || clientY >= r.bottom) continue;
@@ -14293,12 +14297,13 @@ Renderer.prototype.유닛불투명픽셀인가 = function (u, clientX, clientY) 
 Renderer.prototype.화면점유닛 = function (units, clientX, clientY) {
   if (!this.unitEls) return null;
   var best = null, bestZ = -Infinity;
+  var GP = root.G2유닛GPU층, 새 = !!(GP && GP.쓸까 && GP.쓸까(this)), 호 = 새 ? this.host.getBoundingClientRect() : null;   /* 정본 456 2단계 */
   for (var i = 0; i < units.length; i++) {
     var u = units[i];
     if (!u.alive) continue;
     var el = this.unitEls[u.id];
     if (!el || !this.유닛불투명픽셀인가(u, clientX, clientY)) continue;
-    var b = el.getBoundingClientRect();
+    var b = (새 && GP.화면사각(el, this, 호)) || el.getBoundingClientRect();
     var z = parseFloat(el.style.zIndex) || 0;
     var key = z * 100000 + b.bottom;
     if (key > bestZ) { bestZ = key; best = u; }

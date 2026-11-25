@@ -15179,8 +15179,9 @@
     if (!_패드빛판) { _패드빛판 = document.createElement('canvas'); _패드빛판.width = 640; _패드빛판.height = 400; }
     var g = _패드빛판.getContext('2d'); g.setTransform(2, 0, 0, 2, 0, 0); g.clearRect(0, 0, 320, 200); g.imageSmoothingEnabled = false;
     var a = 0.6 + 0.4 * Math.abs(Math.sin(Date.now() / 300)), 자리 = [];
+    var GP = window.G2유닛GPU층, 새 = !!(GP && GP.쓸까 && GP.쓸까(R)), 호 = 새 ? R.host.getBoundingClientRect() : null;   /* 정본 456 2단계 — 몸 캔버스 사각을 계산식으로(못 풀면 옛 길) */
     그림들.forEach(function (c) {
-      var r = c.getBoundingClientRect(), x = (r.left - rr.left) * kx, y = (r.top - rr.top) * ky, w = r.width * kx, h = r.height * ky;
+      var r = (새 && GP.화면사각(c, R, 호)) || c.getBoundingClientRect(), x = (r.left - rr.left) * kx, y = (r.top - rr.top) * ky, w = r.width * kx, h = r.height * ky;
       var 실 = document.createElement('canvas'); 실.width = c.width; 실.height = c.height;
       var q = 실.getContext('2d'); q.drawImage(c, 0, 0, 실.width, 실.height); q.globalCompositeOperation = 'source-in'; q.fillStyle = 'rgb(255,205,80)'; q.fillRect(0, 0, 실.width, 실.height);
       [[3, 0.22], [2, 0.42], [1, 0.75]].forEach(function (k) { g.globalAlpha = k[1] * a; for (var t = 0; t < 8; t++) g.drawImage(실, x + Math.cos(t * Math.PI / 4) * k[0], y + Math.sin(t * Math.PI / 4) * k[0], w, h); });
