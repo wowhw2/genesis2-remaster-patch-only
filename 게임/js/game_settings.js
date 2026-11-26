@@ -751,7 +751,31 @@ function 창(옵션) {
     }
   }
 
-  return { 명령: 명령, 패드: 패드, 키: 키, 누름: 누름, 휠: 휠, 그리기: 그리기,
+  /* 정본 478 — 그린 창을 한 장에 담아 두고 상태가 바뀔 때만 다시 그린다
+   *   ☠ 전에는 장마다 모든 글자를 다섯 번(테두리 넷 + 본글) drawText 로 다시 찍어 휴대폰에서 창이 열린 동안 셸 계산이 장마다 30ms 남짓 · 21fps
+   *     (신고 성능기록_휴대폰_20261126_103531 Adreno 740 · 타이틀 위 게임설정 · «느림 21fps(3초 넘게)» · 셸 31ms/장 · 최장 94ms)
+   *   열쇠 = 창 상태·값·판 자리·화면 크기·변환·글꼴·바탕·안내글 종류·패치 글 길이 · 빠진 상태가 있어도 굳지 않게 1초에 한 번은 새로 */
+  var 담은 = null, 담은열쇠 = '', 담은때 = 0;
+  function 담아그리기(ctx, 자원) {
+    var c = ctx && ctx.canvas, 지금 = Date.now();
+    if (!c || typeof document === 'undefined' || !ctx.getTransform) return 그리기(ctx, 자원);
+    var tf = ctx.getTransform(), 열쇠 = '';
+    try {
+      열쇠 = JSON.stringify([s, 값, 자원 && 자원.왼, 자원 && 자원.폭, c.width, c.height, tf.a, tf.b, tf.c, tf.d, tf.e, tf.f,
+        !!(자원 && 자원.글꼴), !!(자원 && 자원.바탕), 정보종류, (패치글 || '').length, root.G2Scaler && root.G2Scaler.N ? root.G2Scaler.N() : 1]);
+    } catch (e) { return 그리기(ctx, 자원); }
+    if (!담은 || 담은.width !== c.width || 담은.height !== c.height) { 담은 = document.createElement('canvas'); 담은.width = c.width; 담은.height = c.height; 담은열쇠 = ''; }
+    if (열쇠 !== 담은열쇠 || 지금 - 담은때 > 1000) {
+      var g = 담은.getContext('2d');
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 담은.width, 담은.height);
+      g.setTransform(tf); g.imageSmoothingEnabled = ctx.imageSmoothingEnabled;
+      그리기(g, 자원);
+      담은열쇠 = 열쇠; 담은때 = 지금;
+    }
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(담은, 0, 0); ctx.restore();
+  }
+
+  return { 명령: 명령, 패드: 패드, 키: 키, 누름: 누름, 휠: 휠, 그리기: 담아그리기, 바로그리기: 그리기,
            값: function () { return 값; }, 상태: function () { return s; }, 쪽들: function () { return 쪽들; } };
 }
 
