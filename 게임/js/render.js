@@ -1554,7 +1554,7 @@ function 유닛공급자(self, file, pal) {
     if (판) {
       var c = document.createElement('canvas');
       c.width = b.canvas.width; c.height = b.canvas.height; c.논리w = b.w; c.논리h = b.h;
-      if (G.칠하기(판, pal, c, 0, 0)) return (cache[n] = { canvas: c, ax: b.ax, ay: b.ay, w: b.w, h: b.h });
+      if (G.칠하기(판, pal, c, 0, 0)) { c._gpu칠 = true; return (cache[n] = { canvas: c, ax: b.ax, ay: b.ay, w: b.w, h: b.h }); }   /* 정본 488 — GPU 색판으로 칠한 그림(판칠 느림 기록에 싣는다) */
     }
     /* GPU 가 못 칠했다 — 이 프레임만 예전대로 CPU */
     var fr = raw[n];
@@ -7721,6 +7721,18 @@ Renderer.소멸가늘기열 = 소멸가늘기열;
  *   1초에 10번 넘게 칠하면 콘솔에 한 줄(성능 기록의 콘솔끝에 실린다): 횟수 · 갈래 · 같은 그림 번호인데 그림 객체만 새것 · 많이 칠한 유닛 */
 var _판칠 = { 때: 0, n: 0, 갈래: {}, 새객체: 0, 유닛: {}, 원인: {} };
 function 판칠원인(이름) { _판칠.원인[이름] = (_판칠.원인[이름] | 0) + 1; }   /* 그림 캐시를 통째로 비운 곳 · 횟수 */
+var _판칠느림 = { 때: 0, n: 0, 최장: null };
+/* 한 번 칠하기가 4ms 를 넘으면 — 1초에 한 줄: 몇 번 · 가장 느린 것의 몫(크기 다시 잡기 · 옮겨 그리기 · 모양 쓰기) · 그림 크기 · GPU 색판 그림인가 */
+function 판칠느림(u, t0, t1, t2, t3, 크바꿈, 원판) {
+  var 합 = t3 - t0; if (합 < 4) return;
+  var s = _판칠느림, 지금 = Date.now(); s.n++;
+  if (!s.최장 || 합 > s.최장.합) s.최장 = { 합: 합, 크기: t1 - t0, 그리기: t2 - t1, 모양: t3 - t2, 크바꿈: 크바꿈, 그림: 원판 ? 원판.width + 'x' + 원판.height : '?', gpu: !!(원판 && 원판._gpu칠), id: u.id };
+  if (지금 - s.때 >= 1000) {
+    var m = s.최장;
+    if (root.console && console.info) console.info('[유닛판칠느림] 1초 ' + s.n + '번 · 가장 느림 ' + m.합.toFixed(1) + 'ms (크기 ' + m.크기.toFixed(1) + (m.크바꿈 ? '·바꿈' : '') + ' · 그리기 ' + m.그리기.toFixed(1) + ' · 모양 ' + m.모양.toFixed(1) + ') · 그림 ' + m.그림 + (m.gpu ? ' GPU색판' : ' CPU') + ' · 유닛 ' + m.id);
+    _판칠느림 = { 때: 지금, n: 0, 최장: null };
+  }
+}
 function 판칠셈(u, 층, 번호, 갈래, 프레임) {
   var s = _판칠, 지금 = Date.now();
   s.n++; s.갈래[갈래] = (s.갈래[갈래] | 0) + 1; s.유닛[u.id] = (s.유닛[u.id] | 0) + 1;
@@ -7780,14 +7792,18 @@ function 유닛층그리기(renderer, u, 층들, ox, oy) {
         /* ★ 보통 몸 — PNG 로 굽지 않고 층 안 캔버스에 바로 칠한다 (2026-10-06 · 위 `_유닛프레임정보` 주석) */
         층.el.style.cssText = 'position:absolute;width:' + 프레임.w + 'px;height:' + 프레임.h + 'px;z-index:' + i + ';';
         if (!판) { 판 = 층.el._판 = document.createElement('canvas'); 층.el.appendChild(판); }
+        var _크0 = _성 ? performance.now() : 0, _크바꿈 = 판.width !== 프레임.canvas.width || 판.height !== 프레임.canvas.height;
         if (판.width !== 프레임.canvas.width) 판.width = 프레임.canvas.width;
         if (판.height !== 프레임.canvas.height) 판.height = 프레임.canvas.height;
+        var _크1 = _성 ? performance.now() : 0;
         var g판 = 판.getContext('2d');
         g판.clearRect(0, 0, 판.width, 판.height);
         /* ☠ 스케일러가 drawImage 를 가로챈다 — 원본 사각형은 논리 크기, 목적지는 실제 크기로 준다(_오브젝트색칠하기 와 같은 꼴) */
         var 원판 = 프레임.canvas;
         g판.drawImage(원판, 0, 0, 원판.논리w || 원판.width, 원판.논리h || 원판.height, 0, 0, 판.width, 판.height);
+        var _크2 = _성 ? performance.now() : 0;
         판.style.cssText = 'display:block;width:' + 프레임.w + 'px;height:' + 프레임.h + 'px;image-rendering:' + rend() + ';';
+        if (_성) 판칠느림(u, _크0, _크1, _크2, performance.now(), _크바꿈, 원판);
       } else {
         if (판) 판.style.display = 'none';
         층.el.style.cssText = 'position:absolute;background-repeat:no-repeat;' +
