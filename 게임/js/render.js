@@ -1495,7 +1495,9 @@ Renderer.prototype._팔레트따라잡기 = function (file) {
   if (!지금 || !this._usprPal || !this._usprRaw) return false;
   if (!this._usprPal[file] || this._usprPal[file] === 지금) return false;
   if (typeof this._uspr[file] !== 'function' || !this._usprRaw[file]) return false;
+  var _성 = root.G2성능, _팔0 = _성 ? performance.now() : 0;
   this._uspr[file] = 유닛공급자(this, file, 지금);
+  if (_성) _성.더하기('유닛:색판', performance.now() - _팔0);   /* 정본 472 — 색판이 바뀌어 그 파일 공급자를 새로 지은 시간 */
   this._usprPal[file] = 지금;
   /* data-URL·실루엣 캐시도 팔레트를 물고 있다 — **그 파일 것만** 버린다 */
   var self = this, 앞 = file + '#';
@@ -7710,7 +7712,9 @@ function 유닛층그리기(renderer, u, 층들, ox, oy) {
     var 메타 = 층.meta;
     var 위치 = 유닛프레임위치(메타, u);                 /* 0x13175 · 0x1318A */
     var 파일 = renderer._스프라이트파일(메타, 층.no);
+    var _성 = root.G2성능, _그0 = _성 ? performance.now() : 0;
     var 프레임 = renderer._유닛프레임정보(파일, 위치.번호);
+    if (_성) _성.더하기('유닛:그림', performance.now() - _그0);
     if (!프레임) { 층.el.style.display = 'none'; return; }
     층.el.style.display = '';
 
@@ -7727,6 +7731,7 @@ function 유닛층그리기(renderer, u, 층들, ox, oy) {
     }
     if (가늘) key = '가늘#' + 가늘 + '#' + (프레임.열쇠 || 프레임.url || 위치.번호);
     if (층.el._url !== key) {
+      var _칠0 = _성 ? performance.now() : 0;
       층.el._url = key;
       var 판 = 층.el._판;
       if (가늘) {
@@ -7760,6 +7765,7 @@ function 유닛층그리기(renderer, u, 층들, ox, oy) {
           'image-rendering:' + rend() + ';' + bgcss(url || 프레임.url, 프레임.w, 프레임.h) +
           'width:' + 프레임.w + 'px;height:' + 프레임.h + 'px;z-index:' + i + ';';
       }
+      if (_성) _성.더하기('유닛:판칠', performance.now() - _칠0);
     }
     층.el.style.left = (ox + (프레임.ax | 0) + (가늘 >> 1)) + 'px';   /* 정본 256 — 0x469E0 sar eax,1 · 0x469F0 add eax,edx : x = X + 가늘/2 */
     var 위 = oy + (프레임.ay | 0);
@@ -7953,8 +7959,11 @@ Renderer.prototype.updateUnit = function (u) {
    * ★ `_ensureUnit` 은 층이 0개면 `updateUnit` 을 안 부르므로 여기서 순환하지 않는다. */
   /* ★ 여기서 층 수를 보면 `_ensureUnit → updateUnit → _ensureUnit` 무한 재귀가 된다
    *   (층이 영영 안 채워지는 경우). 층 수 판단은 **`_ensureUnit` 한 곳에서만** 한다. */
-  if (!box || box._layerSig !== sig || !(box._layers || []).length)
+  if (!box || box._layerSig !== sig || !(box._layers || []).length) {
+    var _성상 = root.G2성능, _상0 = _성상 ? performance.now() : 0;
     box = this._유닛상자확보(u);
+    if (_성상) _성상.더하기('유닛:상자', performance.now() - _상0);   /* 정본 472 — 휴대폰 «반영:유닛» 1초 멈춤을 몫별로 (상자 짓기 · 그림 얻기 · 판 칠하기 · 색판 따라잡기) */
+  }
   if (!box || !(box._layers || []).length) return;   // 그림이 아직 — 이번 프레임은 건너뛴다
   /* ★ `_hidden` — 연출이 유닛을 잠시 맵에서 지울 때 씁니다 (원본 `[+0x63] = 0` →
    *   `0x11EE4` 로 그 칸을 다시 그리는 자리). 여기서 매 프레임 display 를 되살리므로
