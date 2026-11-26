@@ -2546,7 +2546,7 @@ Renderer.prototype._팔레트만갈기본 = function (pal, 딱지) {
   this._지금딱지 = 딱지;
   this.nmap.palette = pal;
   this._palette = pal;
-  this._blkCache = {}; this._uurl = {}; this._silCache = {};
+  판칠원인('색판만갈기'); this._blkCache = {}; this._uurl = {}; this._silCache = {};
   this._effcURL = {}; this._shdURL = {};
   /* ☠ 바닥 애니 타일(물·용암·풀) 그림도 팔레트를 문다 — 안 비우면 흰 섞기 중 처음 만든 장면이 마법 뒤에도 하얗게 돈다
    *   (2026-09-25 사장님 「선라이트의 경우 맵 일부가 하얗게 남는 문제도 있어」 · 옛 되돌리기 길 _팔레트반영 도 안 비웠다) */
@@ -2879,7 +2879,7 @@ Renderer.prototype._가벼운암전걸기 = function (dac, keepPct) {
 Renderer.prototype._유닛만다시칠하기 = function (pal) {
   var self = this;
   if (!pal || !root.G2Native) return this;
-  this._uurl = {}; this._silCache = {}; this._effcURL = {}; this._shdURL = {};
+  판칠원인('유닛만다시칠'); this._uurl = {}; this._silCache = {}; this._effcURL = {}; this._shdURL = {};
   if (this._effcRaw) this._effc = root.G2Native.spriteCanvasProvider(this._effcRaw, pal);
   if (this._usprRaw && this._uspr) {
     this._usprPal = this._usprPal || {};
@@ -3044,7 +3044,7 @@ Renderer.prototype._팔레트반영 = function (pal) {
   /* 블록·프레임 data-URL 캐시는 팔레트가 박혀 있으므로 통째로 버린다 */
   this._blkCache = {};
   this._tileURLCache = {};              // ★ 바닥 애니 타일도 팔레트를 문다 (2026-09-25 · 팔레트만갈기 주석)
-  this._uurl = {};
+  판칠원인('색판반영'); this._uurl = {};
   this._silCache = {};                  // ★ 발광 실루엣 (0x5F517) — 배율이 바뀌면 다시 굽는다
   /* 상태이상 이펙트도 팔레트를 물고 있다 (CHR_EFFC.SYB) */
   this._effcURL = {};
@@ -6503,7 +6503,7 @@ Renderer.prototype.rebuildForScaler = function (즉시) {
      *   그래도 옛 세대가 메모리에 남지 않도록 여기서 비운다. */
     self._shdURL = {};
     /* 유닛 프레임 그림도 새 배율로 다시 굽습니다 (원본 프레임 자체는 그대로) */
-    self._uurl = {}; self._uspr = {}; self._footCache = {}; self._silCache = {};
+    판칠원인('스케일러'); self._uurl = {}; self._uspr = {}; self._footCache = {}; self._silCache = {};
     /* 상태이상 이펙트도 새 배율로 다시 굽는다 — 원본 프레임(_effcRaw)은 그대로 */
     self._effcURL = {};
     if (self._effcRaw && self._palette)
@@ -7717,6 +7717,23 @@ Renderer.소멸가늘기열 = 소멸가늘기열;
 
 /* 현재 유닛 프레임을 각 DOM 층에 반영한다. 프레임 선택 계산은
  * `유닛프레임위치`가 맡고, 이 함수는 표시 쓰기와 상단 측정만 맡는다. */
+/* 정본 488 — 휴대폰 9-8 3D 적 이동 중 «유닛:판칠» 이 장마다 25~148ms(PC 는 같은 조건에서 0번) — 무엇이 판을 다시 칠하게 하는지 기록에 남긴다
+ *   1초에 10번 넘게 칠하면 콘솔에 한 줄(성능 기록의 콘솔끝에 실린다): 횟수 · 갈래 · 같은 그림 번호인데 그림 객체만 새것 · 많이 칠한 유닛 */
+var _판칠 = { 때: 0, n: 0, 갈래: {}, 새객체: 0, 유닛: {}, 원인: {} };
+function 판칠원인(이름) { _판칠.원인[이름] = (_판칠.원인[이름] | 0) + 1; }   /* 그림 캐시를 통째로 비운 곳 · 횟수 */
+function 판칠셈(u, 층, 번호, 갈래, 프레임) {
+  var s = _판칠, 지금 = Date.now();
+  s.n++; s.갈래[갈래] = (s.갈래[갈래] | 0) + 1; s.유닛[u.id] = (s.유닛[u.id] | 0) + 1;
+  if (층.el._칠번호 === 번호 && 층.el._칠그림 !== 프레임) s.새객체++;
+  층.el._칠번호 = 번호; 층.el._칠그림 = 프레임;
+  if (지금 - s.때 >= 1000) {
+    if (s.n >= 10 && root.console && console.info) {
+      var 상위 = Object.keys(s.유닛).sort(function (a, b) { return s.유닛[b] - s.유닛[a]; }).slice(0, 4).map(function (k) { return k + '×' + s.유닛[k]; }).join(' ');
+      console.info('[유닛판칠] 1초 ' + s.n + '번 · 갈래 ' + JSON.stringify(s.갈래) + ' · 같은번호새그림 ' + s.새객체 + ' · 캐시비움 ' + JSON.stringify(s.원인) + ' · 유닛 ' + 상위);
+    }
+    _판칠 = { 때: 지금, n: 0, 갈래: {}, 새객체: 0, 유닛: {}, 원인: {} };
+  }
+}
 function 유닛층그리기(renderer, u, 층들, ox, oy) {
   var topY = null;
   층들.forEach(function (층, i) {
@@ -7743,6 +7760,7 @@ function 유닛층그리기(renderer, u, 층들, ox, oy) {
     if (가늘) key = '가늘#' + 가늘 + '#' + (프레임.열쇠 || 프레임.url || 위치.번호);
     if (층.el._url !== key) {
       var _칠0 = _성 ? performance.now() : 0;
+      if (_성) 판칠셈(u, 층, 위치.번호, 발광 != null ? '발광' : u.치환표 === 2 ? '치환' : 가늘 ? '가늘' : '보통', 프레임);
       층.el._url = key;
       var 판 = 층.el._판;
       if (가늘) {
