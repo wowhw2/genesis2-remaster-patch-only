@@ -22,6 +22,38 @@
   if (typeof root.DOMMatrix !== 'function') return;
 
   function 판(R) { return R && R.spriteLayer; }
+
+  /* 6단계 — 캔버스 바뀜 번호: 2D 그리기(그림 옮김·픽셀 넣기·칠하기·지우기·글자)와 크기 바꾸기(내용이 지워진다)마다 canvas._gp판번 을 올린다
+   *   GPU 층은 번호가 그대로인 캔버스를 다시 올리지 않는다(텍스처) · 2D·bitmaprenderer 밖 맥락(WebGL 등)으로 그리는 캔버스는 _gp맥락밖 — 장마다 올림
+   *   스케일러(scaler.js)·팔레트 GPU(palettegpu.js:279 drawImage)가 drawImage 를 감싸도 어느 차례든 이 감쌈을 지난다 · 실패하면 조용히 — 번호가 없으면 장마다 올림 */
+  var 캔번 = 0;
+  (function 캔버스바뀜감시() {
+    try {
+      var 감싸 = function (P, 이름들) {
+        if (!P) return;
+        이름들.forEach(function (k) {
+          var 원 = P[k]; if (typeof 원 !== 'function' || 원._gp감쌈) return;
+          var 새 = function () { var c = this && this.canvas; if (c) c._gp판번 = ++캔번; return 원.apply(this, arguments); };
+          새._gp감쌈 = true; P[k] = 새;
+        });
+      };
+      감싸(root.CanvasRenderingContext2D && root.CanvasRenderingContext2D.prototype,
+        ['drawImage', 'putImageData', 'fillRect', 'clearRect', 'strokeRect', 'fill', 'stroke', 'fillText', 'strokeText', 'reset']);
+      감싸(root.ImageBitmapRenderingContext && root.ImageBitmapRenderingContext.prototype, ['transferFromImageBitmap']);
+      var CP = root.HTMLCanvasElement && root.HTMLCanvasElement.prototype;
+      if (!CP) return;
+      ['width', 'height'].forEach(function (k) {
+        var d = Object.getOwnPropertyDescriptor(CP, k); if (!d || !d.set || d.set._gp감쌈) return;
+        var s = function (v) { this._gp판번 = ++캔번; return d.set.call(this, v); }; s._gp감쌈 = true;
+        Object.defineProperty(CP, k, { configurable: true, enumerable: d.enumerable, get: d.get, set: s });
+      });
+      var 원gc = CP.getContext;
+      if (원gc && !원gc._gp감쌈) {
+        var gc = function (종류) { var r = 원gc.apply(this, arguments); if (r && 종류 !== '2d' && 종류 !== 'bitmaprenderer') this._gp맥락밖 = true; return r; };
+        gc._gp감쌈 = true; CP.getContext = gc;
+      }
+    } catch (e감시) {}
+  })();
   /* render.js:6762 평면틀 — 브라우저가 정규화한 꼴(공백 뺌)로 견준다 */
   var 고정틀 = 'translate(calc(-1*var(--pl)),calc(-1*var(--pt)))var(--w)translate(var(--pl),var(--pt))translate(var(--ox),var(--oy))var(--loc)translate(calc(-1*var(--ox)),calc(-1*var(--oy)))';
 
@@ -185,9 +217,29 @@
   function 묶음끝() { 묶음 = null; }
 
   /** 요소 → { m, w, h } — m 은 요소 안 (x, y, 0, 1) 을 host 안 CSS px 동차 좌표로 (원근 나눔 전) · 부모 행렬 × 자기 몫(같은 곱 · 순서만 묶음) */
+  /* 6단계 — 장 단위 행렬 담기: 판 안에 바뀐 것이 없으면(변화 관찰 번호·세대 그대로 · 호스트 크기 같음 · 같은 장) 그 장에 센 행렬을 다시 쓴다
+   *   한 장 안에서 유닛띄우기(가림 사각)·GPU 그리기·매 장 고리·재는 점이 같은 요소 행렬을 저마다 처음부터 셌다
+   *   (11-26 18-1 휴대폰 흉내 GPU 켬 프로파일: 행렬 포함 28% · 자기 11.8% — 열쇠 글자 짓기·스타일 읽기) · 그림 자연 크기(img 적재)는 관찰 밖이라 «같은 장»으로 묶는다 · 끄기 __유닛GPU장담끔 */
+  var 장담 = null, 장담판 = null, 장담시각 = -1, 장담세대 = -1, 장담호 = null, 장담w = -1, 장담h = -1, 장담장 = null;
+  function 장담받기(R, L) {
+    if (root.__유닛GPU장담끔 || !root.MutationObserver || root.__유닛GPU관찰끔) return null;
+    if (!묶음) 변화받기(L);
+    if (!관찰 || 관찰판 !== L) return null;
+    var 호 = R.호스트크기 ? R.호스트크기() : null, 지금 = root.document && root.document.timeline ? root.document.timeline.currentTime : null;
+    if (!장담 || 장담판 !== L || 장담시각 !== 판시각 || 장담세대 !== 관찰세대 || 장담호 !== 호 || (호 && (장담w !== 호.w || 장담h !== 호.h)) || 장담장 !== 지금) {
+      장담 = new Map(); 장담판 = L; 장담시각 = 판시각; 장담세대 = 관찰세대; 장담호 = 호; 장담w = 호 ? 호.w : -1; 장담h = 호 ? 호.h : -1; 장담장 = 지금;
+    }
+    return 장담;
+  }
   function 행렬(e, R) {
     R = R || root.R;
-    var L = 판(R);
+    var L = 판(R), 장 = (L && e && e !== L) ? 장담받기(R, L) : null;
+    if (장) { var 든 = 장.get(e); if (든) return 든; }
+    var r = 행렬계산(e, R, L);
+    if (장) 장.set(e, r);
+    return r;
+  }
+  function 행렬계산(e, R, L) {
     if (!L || !e) return { 없음: '판 없음' };
     if (e === L) return { 없음: '판 자체' };
     if (묶음 && 묶음.has(e)) return 묶음.get(e);
@@ -473,11 +525,15 @@
     if (!v) { t = gl.createTexture(); v = { t: t }; 층.판텍.set(키, v); }
     v.장 = 층.장;
     gl.bindTexture(gl.TEXTURE_2D, t);
-    /* 그림 파일(img·배경 그림)·단색 캔버스는 안 바뀐다 — 한 번만 올림 · 게임 캔버스는 내용이 바뀌므로 장마다 */
-    if (!(v.올림 && (원천.tagName !== 'CANVAS' || 원천._고정))) {
+    /* 그림 파일(img·배경 그림)·단색 캔버스는 안 바뀐다 — 한 번만 올림
+     *   게임 캔버스는 «캔버스 바뀜 번호»(_gp판번 · 아래 캔버스바뀜감시)가 지난번 올린 번호와 다를 때만 (6단계 · 11-26 18-1 휴대폰 흉내: 장마다 356장 4.2MB · 3.75ms)
+     *   번호를 모르는 캔버스(2D 밖 맥락 · 감시 전에만 그려짐)는 장마다 · 끄기 __유닛GPU매장올림 */
+    var 캔 = 원천.tagName === 'CANVAS', 번 = 캔 ? 원천._gp판번 : null;
+    var 다시 = !v.올림 || (캔 && !원천._고정 && (root.__유닛GPU매장올림 || 원천._gp맥락밖 || 번 === undefined || 번 !== v.판번));
+    if (다시) {
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, 원천);
-      v.올림 = true;
+      v.올림 = true; v.판번 = 번; 층.올림셈 = (층.올림셈 | 0) + 1;
     }
     var f = 부드럽게 ? gl.LINEAR : gl.NEAREST;
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
@@ -686,7 +742,7 @@
     if (L.style.visibility !== 'hidden') { L.style.visibility = 'hidden'; L._유닛GPU감춤 = true; }
     return true;
   }
-  function 상태() { return 층 ? { 마지막: 층.마지막 || '', 실패: 층.실패 || '', 잃음: !!층.잃음, 텍스처: 층.판텍 ? 층.판텍.size : 0, 다시씀: 층.다시씀 | 0, 새로씀: 층.새로씀 | 0 } : null; }
+  function 상태() { return 층 ? { 마지막: 층.마지막 || '', 실패: 층.실패 || '', 잃음: !!층.잃음, 텍스처: 층.판텍 ? 층.판텍.size : 0, 다시씀: 층.다시씀 | 0, 새로씀: 층.새로씀 | 0, 올림: 층.올림셈 | 0 } : null; }
   function 외곽() { return 층 && 층.외곽 ? 층.외곽 : []; }
 
   /* 장마다 다시 그림 — 캔버스 그림이 반영(apply) 없이 바뀌어도 따라가게 (3단계 · 끄면 한 번 되돌리고 멈춤) */

@@ -458,6 +458,15 @@
     for (var si = 0; si < 세운.length; si++) {
       var box = 세운[si].box, u = 세운[si].u, 닻 = 세운[si].닻;
       var r = 그림사각(box, false, 재);
+      /* ★ 정본 482 — 구조물(문·감옥벽)은 윗단을 clip-path 로 잘라 낸다(구조세우기) — 잘린 줄은 화면에 없는데 상자(getBoundingClientRect)는 clip 을 모른다
+       *   ☠ 9-6 PRISON01: 남쪽 감옥문(10,32) 상자가 잘린 윗단만큼(화면 80px) 위로 커져 북쪽 감옥문(10,24)·그 앞 병사 자리와 겹쳤다 — 겹친 자리는 가까운 판(남쪽 문)이 이겨
+       *     그 사이 남쪽 벽(28~32줄 · 높이 150)이 북쪽 문 아랫단·병사를 못 덮었다 (사장님 11-26 「벽 위쪽으로 캐릭터가 비쳐보이고 북쪽 감옥문이 남쪽 벽을 가려」)
+       *   ⇒ 잘린 선(상자 안 세로 자름px)에 높이 0 표지(구조세우기 가 둔다)를 두고 그 화면 자리로 윗변을 내린다 — 비례로 내리면 원근 탓에 1~2px 틈이 남았다 */
+      if (box._3d자름 > 0.5 && box._3d자름표 && box._3d자름표.parentNode === box) { var 자선 = box._3d자름표.getBoundingClientRect(), 윗 = Math.ceil(자선.top - 호.top) + 1 + 호.top;   /* 옛 길 r 은 뷰포트 좌표 · 새 길(재)은 host 안 좌표
+         *   올림 — 지정본그리기 지형가림 가위가 윗변을 내림(floor)하므로 잘린 선이 픽셀 중간이면 그 한 줄을 이 판이 차지해 아래 판 그림이 1px 줄로 비쳤다 ·
+         *   +1 — 잘린 선 바로 아래 줄은 clip 가장자리 섞임으로 반쯤 비친다(9-6 실측 253줄 · 뒤 문 색이 섞임) */
+        if (재) { 호진짜 = 호진짜 || R.host.getBoundingClientRect(); 윗 = Math.ceil(자선.top - 호진짜.top) + 1; }
+        if (윗 > r.top && 윗 < r.bottom) r = { left: r.left, top: 윗, right: r.right, bottom: r.bottom, width: r.width, height: r.bottom - 윗 }; }
       if (r.width < 1 || r.height < 1) continue;
       var 줄 = Number.isFinite(box._row) ? box._row : (u.y | 0);
       /* 실행기 목록 D(절벽 위 유닛은 모든 줄 위 · 원본 규칙)는 3D 에서는 따르지 않고 선 칸의 줄로 가린다
@@ -532,7 +541,7 @@
     if (평평한판(box.parentNode)) { 평평세우기(R, s, box, 닻); return; }
     var 면 = 구조물인가(box._unit) && box._unit && !box._3d유닛값 ? 구조면(R, s, box, 닻) : null;
     if (면) { 구조세우기(R, s, box, 닻, 면); return; }
-    if (box._3d구조면) { box.style.clipPath = ''; box._3d구조면 = null; }
+    if (box._3d구조면) { box.style.clipPath = ''; box._3d구조면 = null; box._3d자름 = 0; }
     var 돌 = (닻.돌 != null) ? 닻.돌 : 현재돌;   /* 닻.돌 — 카메라 대신 정한 방향으로 선 판(천지 3D 빛 벽 · 경계선 방향) */
     var o = 원점(box), r = 돌 * Math.PI / 180, k = 세로배율();
     var d = o.l + o.ox - (닻.x - R.mapW / 2), e = (닻.F - R.mapH / 2) - o.t - o.oy;
@@ -593,6 +602,12 @@
     /* 면 윗끝(윗줄) 위의 그림 줄 — 원작에선 성벽 윗단(평평한 윗면)에 그려진 줄이라 면을 따라 올리면 윗면 위로 턱이 솟는다 (9-6 감옥벽 · 33-2 감옥문) ⇒ 잘라 내고 윗면 지형 그림에 맡긴다 */
     var 자름 = 면.윗줄 - (o.t + R.mapH / 2), 클 = 자름 > 0.5 ? 'inset(' + 자름.toFixed(1) + 'px -400px -400px -400px)' : '';
     if (box.style.clipPath !== 클) box.style.clipPath = 클;
+    box._3d자름 = 클 ? 자름 : 0;
+    if (클) { var 표 = box._3d자름표;   /* 정본 482 — 잘린 선 표지(높이 0 · 보이지 않음) — 유닛띄우기 가 가림 상자 윗변으로 잰다 */
+      if (!표) { 표 = box._3d자름표 = document.createElement('div'); 표.className = 'g2-3d자름표'; 표.style.cssText = 'position:absolute;left:0;width:1px;height:0;pointer-events:none;visibility:hidden'; }
+      if (표.parentNode !== box) box.appendChild(표);
+      var 표윗 = 자름.toFixed(1) + 'px'; if (표.style.top !== 표윗) 표.style.top = 표윗; }
+    else if (box._3d자름표 && box._3d자름표.parentNode) box._3d자름표.parentNode.removeChild(box._3d자름표);
     box._3d국 = tf; box._3d들림 = 면.발높; box._3d닻 = 닻; box._3d구조면 = 면;
     if (s.세운것) s.세운것.add(box);
   }
@@ -1542,7 +1557,7 @@
     for (var k in 상자들) {
       var box = 상자들[k];
       if (box && box._shd && box._shd.style.transform === 'rotateX(90deg)') box._shd.style.transform = '';
-      if (box && box._3d구조면) { box.style.clipPath = ''; box._3d구조면 = null; }   /* 구조물 판 윗줄 자름 풀기 */
+      if (box && box._3d구조면) { box.style.clipPath = ''; box._3d구조면 = null; box._3d자름 = 0; }   /* 구조물 판 윗줄 자름 풀기 */
       if (!box || (!box._3d들림 && !box._3d국)) continue;
       var 판 = box.parentNode;
       if (판 && 판._평면tf) { if (box._평면loc) box.style.setProperty('--loc', box._평면loc); }
