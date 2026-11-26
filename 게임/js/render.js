@@ -1528,6 +1528,37 @@ Renderer.prototype._팔레트따라잡기 = function (file) {
  *   스케일러 1배 · GPU 없음 · 판을 못 올리면 예전대로 spriteCanvasProvider(CPU).
  */
 var 유닛바탕주인 = null;   /* 유닛 바탕 텍스처를 가진 렌더러 — 전투를 바꾸면 렌더러가 새로 생겨 옛 텍스처가 그래픽 메모리에 쌓였다 (정본 304) */
+/* ★ 정본 488 — 휴대폰: 바탕과 다른 색판(날씨·밤·연출)이 «머물면» 그 색판을 새 바탕으로 CPU 로 다시 굽는다
+ *   GPU 색판 길(아래 유닛공급자)은 색판이 빨리 바뀌는 연출(선라이트 51걸음 · 10-06)을 위한 것 — 그런데 색판이 바뀐 채 머무는 동안에도 계속 이 길을 타
+ *   새 동작 그림마다 «GPU 로 칠한 캔버스»를 유닛 판에 옮겨 그리며 그래픽 카드 일을 기다렸다
+ *   (휴대폰 R0.1.130·131 [유닛판칠느림] 7대: 느린 판칠은 모두 «그리기» 9~90ms · 모두 GPU 색판 그림 · 크기·모양은 0.1ms 안팎 — 사장님 11-26 「488 처리해」)
+ *   ⇒ 색판이 1.5초 그대로면 그 파일들을 지금 색판으로 다시 굽고(CPU · 그 뒤 판칠은 옮겨 그리기만) GPU 판 텍스처를 내린다 · PC 는 그대로(옮겨 그리기가 빠르고 4배 다시 굽기가 무겁다) · 끄기 window.__색판머묾끔 */
+function 색판머묾쓸까() {
+  if (root.__색판머묾끔) return false;
+  if (root.G2터치) return true;
+  try { var q = String((root.location && root.location.search) || ''); try { q = decodeURIComponent(q); } catch (e1) { } return /[?&]모바일=1/.test(q); } catch (e2) { return false; }
+}
+function 색판머묾예약(self) {
+  if (self._색판머묾) clearTimeout(self._색판머묾);
+  var 그때 = self._유닛쓸팔 || self._유닛팔레트();
+  self._색판머묾 = setTimeout(function () { self._색판머묾 = null; if ((self._유닛쓸팔 || self._유닛팔레트()) !== 그때) { 색판머묾예약(self); return; } 색판다시굽기(self, 그때); }, 1500);
+}
+function 색판다시굽기(self, 지금) {
+  var 바들 = self._유닛바탕, G = root.G2PaletteGPU, n = 0;
+  if (!바들 || !지금 || self._렌더러폐기됨) return 0;
+  Object.keys(바들).forEach(function (f) {
+    var 바 = 바들[f];
+    if (!바 || 바.pal === 지금 || !self._usprRaw || 바.raw !== self._usprRaw[f]) return;
+    if (!self._usprPal || !(self._usprPal[f] === 지금 || 같은색판(self._usprPal[f], 지금))) return;   /* 이 파일이 아직 이 색판을 따라잡지 않았다 */
+    if (G && 바.판) Object.keys(바.판).forEach(function (k) { if (바.판[k]) G.버리기(바.판[k]); });
+    var 새 = 바들[f] = { raw: 바.raw, pal: 지금, prov: root.G2Native.spriteCanvasProvider(바.raw, 지금), 판: {}, N: 바.N, 필터: 바.필터 };
+    self._uspr[f] = 새.prov; self._usprPal[f] = 지금;
+    var 앞 = f + '#'; if (self._uurl) Object.keys(self._uurl).forEach(function (k) { if (k.indexOf(앞) === 0) delete self._uurl[k]; });
+    n++;
+  });
+  if (n) { 판칠원인('색판머묾'); try { if (root.console && console.info) console.info('[유닛색판] 색판이 1.5초 머물러 ' + n + '개 파일을 CPU 로 다시 구움(GPU 색판 길 그만)'); } catch (e) { } }
+  return n;
+}
 function 유닛공급자(self, file, pal) {
   var raw = self._usprRaw && self._usprRaw[file], S = root.G2Scaler, G = root.G2PaletteGPU;
   if (!raw) return null;
@@ -1544,6 +1575,7 @@ function 유닛공급자(self, file, pal) {
     바 = 바들[file] = { raw: raw, pal: pal, prov: root.G2Native.spriteCanvasProvider(raw, pal), 판: {}, N: S.N(), 필터: S.cur() };
   }
   if (바.pal === pal) return 바.prov;
+  if (색판머묾쓸까()) 색판머묾예약(self);   /* 정본 488 — 휴대폰: 이 색판이 1.5초 머물면 CPU 로 다시 굽는다(아래) */
   var cache = {};
   return function (n) {
     if (cache[n] !== undefined) return cache[n];
