@@ -1802,6 +1802,30 @@ function 소환필요(battle, u) {
   if (짝.length === 1) return idiv(짝[0].maxHp | 0, 2) > (짝[0].hp | 0);
   return false;
 }
+/* [리마스터] 소환사AI (정본 479) — 기본 켬 · '원작' 이면 0x43CA9 → 2 그대로(가만히) */
+function 소환사AI켬() {
+  var O = root.Opt || root.G2Opt, c = O && O.cfg;
+  return !(c && c['소환사AI'] === '원작');
+}
+/** [리마스터] 소환사AI 를 쓸 유닛인가 — 무기 2 · 0x43CA9 → 2 · 소환 계열을 씀 · 토글 켬 (controller runAi 가 무기 2 마법 고리 대신 일반 고리로 보낸다) */
+function 소환사AI길(battle, u) {
+  return !!(u && 소환사AI켬() && wtOf(battle, u) === 2 && 무기2갈래(u) === 2 && 계열랭크(battle, u, 5) >= 0);
+}
+/** [리마스터] 소환사AI — 소환이 필요하면(0x42D51) 링 문턱(magicGate)을 넘는 가장 높은 단계의 소환 마법 · 대상은 원본 소환 전용(시전자 둘레) · 못 하면 null */
+function 소환시도(battle, u) {
+  if (!u || u._마법금지 || ((u.ailment | 0) & 8)) return null;                       /* 마법시도 0x432CA 와 같은 막힘 */
+  var 랭 = 계열랭크(battle, u, 5);
+  if (랭 < 0 || !소환필요(battle, u)) return null;
+  var Rg = root.G2Ring, T = battle.T;
+  for (var 레 = 6; 레 >= 0; 레--) {
+    var sp = 5 * 21 + 레 * 3 + 랭;
+    if (Rg && Rg.magicGate && Rg.magicGate(battle, u, sp, T)) continue;              /* 링과 같은 문턱(클래스·TP·MP) */
+    var 대상 = 마법AI대상(battle, u, sp);
+    if (!대상) continue;
+    return { 결과: 1, spell: sp, 대상: 대상 };
+  }
+  return null;
+}
 function 사기(battle, u) { var m = battle.morale || {}; return ((u.side | 0) === 3) ? (m.enemy | 0) : (m.ally | 0); }   /* 0xF0BA2 / 0xF0BA0 */
 
 function 마법고르기(battle, u, 회차, opts) {
@@ -2514,11 +2538,23 @@ function act(battle, unit, opts) {
    *   0x19~0x20·0x26~0x28·0x34 → 0x43526 마법형 · 0x21~0x25 → 0x438AE 원거리 마법형 · 그 밖 → 아무것도 안 함
    *   ☐ 보스 광역기(0xA1·0x5B~0x5D → 0x43CF0) · 소환(0xA4 → 0x4426D) · 대형/궁(0x40DFD) 은 아직 일반 루프로 돈다 */
   var wt0 = wtOf(battle, unit), job0 = unit.job | 0;
+  var 소환사일반 = false;   /* [리마스터 소환사AI] 소환할 게 없으면 무기 2 고리 대신 아래 일반 고리(다가가 공격)로 */
   if (wt0 === 2) {
     var 마법형 = (job0 >= 0x19 && job0 <= 0x20) || (job0 >= 0x26 && job0 <= 0x28) || job0 === 0x34;
     var 원거리마법형 = (job0 >= 0x21 && job0 <= 0x25);
+    /* [리마스터] 소환사AI (정본 479 · 사장님 11-26 «리마스터 옵션 추가») — 원작은 0x43CA9 → 2 라 소환사(0x29 Sorcerer 등)를 AI 로 두면 가만히 있다
+     *   (신고 버그신고_20261126_133244 「버그인지는 모르겠는데 소환사는 AI모드하면 아무 행동을 안해요」)
+     *   켜면: 소환 계열(5)을 쓸 수 있는 유닛만 — 소환이 필요하면(0x42D51 · 부른 소환수 없음·하나인데 HP 절반 아래) 쓸 수 있는 가장 높은 단계 소환 ·
+     *         아니면 일반 고리(다가가 공격)로 · 소환 계열이 없는 직업(샤먼·엑소시스트 …)은 원작대로 */
+    if (!마법형 && !원거리마법형 && 소환사AI켬() && 계열랭크(battle, unit, 5) >= 0) {
+      var 소 = 소환시도(battle, unit);
+      if (소) { plan.action = 2; plan.reason = '[리마스터 소환사AI] 소환'; return 마법계획(battle, unit, plan, 소); }
+      소환사일반 = true;   /* 소환할 게 없으면 아래 일반 고리로 — 무기 2 갈래의 나머지를 건너뛴다 */
+    } else
     if (!마법형 && !원거리마법형) { plan.kind = 'wait'; plan.reason = '0x43CA9 → 2 (아무것도 안 함)';
                                    plan.endStance = endStance(battle, unit); return plan; }
+  }
+  if (wt0 === 2 && !소환사일반) {
     if ((unit.mp | 0) < 10) { plan.kind = 'wait'; plan.reason = 'MP < 10 (0x43530)';
                               plan.endStance = endStance(battle, unit); return plan; }
     if (마법형 || (unit.reserveSpell | 0)) {                        /* 0x43550 · 0x438D5 차징 중일 때만 */
@@ -4091,6 +4127,7 @@ var G2AI = {
    *   전에는 HUD 가 있지도 않은 `ai.target`·`ai.targetUnit` 을 봐서 **늘 「No Target.」** 이었다. */
   'AI목표읽기': AI목표읽기,
   'AI목표유닛찾기': AI목표유닛찾기,
+  소환사AI길: 소환사AI길,   /* [리마스터] 정본 479 */
 
   /* 곁가지 */
   run: run,

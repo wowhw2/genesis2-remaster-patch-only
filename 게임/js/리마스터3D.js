@@ -454,6 +454,7 @@
       세운.push({ box: box0, u: u0, 닻: 닻0 });
     }
     if (새재기) GP.묶음시작();   /* 정본 456 2단계 — 아래 고리는 읽기만 한다(쓰기는 위 고리) · 요소별 행렬을 담아 다시 씀 */
+    try {   /* 정본 456 5단계 전 — 고리에서 예외가 나도 묶음은 닫는다(열린 채면 그 반영 안 다른 재기가 낡은 행렬을 쓴다) */
     for (var si = 0; si < 세운.length; si++) {
       var box = 세운[si].box, u = 세운[si].u, 닻 = 세운[si].닻;
       var r = 그림사각(box, false, 재);
@@ -491,7 +492,7 @@
                       발: { x: 닻.x, y: 닻.가림F != null ? 닻.가림F : 닻.F, h: 닻.높, 눕: true } });
       }
     }
-    if (새재기) GP.묶음끝();
+    } finally { if (새재기) GP.묶음끝(); }
     return 사각;
   }
 
@@ -1698,7 +1699,12 @@
         var 호0 = R.host.getBoundingClientRect(), 앞들 = GP.점유닛후보(units, x - 호0.left, y - 호0.top, R);
         if (앞들) { for (var a = 0; a < 앞들.length; a++) if (R.유닛불투명픽셀인가(앞들[a], x, y)) return 앞들[a]; return null; }
       }
-      var 목 = root.document.elementsFromPoint(x, y), 상자 = new Map(), 본 = [];
+      /* 정본 456 5단계 — GPU 가 그려 판(spriteLayer)을 visibility:hidden 으로 숨긴 장이면 elementsFromPoint 가 유닛을 못 본다 → 이 옛 길에서만 잠깐 보이게 하고 잰 뒤 다시 숨긴다
+       *   (계산식이 못 푸는 질의 — 다른 층 유닛·clip/mask·pointer-events none — 에서만 온다 · 같은 동기 구간이라 화면에는 안 나온다 · 끄기 __유닛GPU점옛길숨김) */
+      var 판0 = R.spriteLayer, 잠깐 = !!(판0 && 판0._유닛GPU감춤 && 판0.style.visibility === 'hidden' && !root.__유닛GPU점옛길숨김);
+      if (잠깐) 판0.style.visibility = '';
+      var 목; try { 목 = root.document.elementsFromPoint(x, y); } finally { if (잠깐) 판0.style.visibility = 'hidden'; }
+      var 상자 = new Map(), 본 = [];
       for (var i = 0; i < (units || []).length; i++) { var u = units[i], b = u && u.alive && R.unitEls && R.unitEls[u.id]; if (b) 상자.set(b, u); }
       for (var j = 0; j < 목.length; j++) {
         var n = 목[j]; while (n && !상자.has(n)) n = n.parentNode;

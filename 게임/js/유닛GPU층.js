@@ -170,11 +170,16 @@
   function 변화받기(L) {
     if (!L || !root.MutationObserver || root.__유닛GPU관찰끔) return;
     /* ☠ 콜백을 빈 함수로 두면 마이크로태스크마다 기록이 콜백으로 넘어가 버려진다 — takeRecords 는 그 뒤 것만 준다(11-26 밝기 관문: 바꾼 filter 를 못 보고 옛 몫을 씀) ⇒ 콜백에서도 찍는다 */
-    if (관찰판 !== L) { if (관찰) 관찰.disconnect(); 관찰 = new root.MutationObserver(찍기); 관찰.observe(L, { attributes: true, subtree: true }); 관찰판 = L; 관찰세대++; }
+    if (관찰판 !== L) { if (관찰) 관찰.disconnect(); 관찰 = new root.MutationObserver(찍기); 관찰.observe(L, { attributes: true, childList: true, subtree: true }); 관찰판 = L; 관찰세대++; }
     찍기(관찰.takeRecords());
   }
   function 찍기(기록) {
-    for (var i = 0; i < 기록.length; i++) 기록[i].target._gp판 = ++판시각;
+    /* 속성이 바뀐 요소는 자기 번호(_gp판) · 그 조상(판 아래까지)과 자식이 바뀐 요소는 «아래 바뀜» 번호(_gp아래) — 상자 계획 담기의 열쇠 */
+    for (var i = 0; i < 기록.length; i++) {
+      var r = 기록[i], t = r.target, n = ++판시각;
+      if (r.type === 'attributes') t._gp판 = n;
+      for (var q = r.type === 'attributes' ? t.parentElement : t; q && q !== 관찰판; q = q.parentElement) q._gp아래 = n;
+    }
   }
   function 묶음시작() { 변화받기(판(root.R)); 묶음 = new Map(); }
   function 묶음끝() { 묶음 = null; }
@@ -491,13 +496,10 @@
   }
   function 쌓임(e) { var z = parseFloat(e.style.zIndex); return isFinite(z) ? z : 0; }
   /* 판 안 그릴 것 모으기 — [{ e, 원천, 부드럽게, 무늬w, 무늬h, 반복, 깊이, 차례 }] · 못 그리면 { 옛길: 까닭 } */
-  function 그릴것(R) {
-    var L = 판(R), 목 = [], 직속 = Array.prototype.slice.call(L.children);
-    직속 = 직속.map(function (c, i) { return { c: c, z: 쌓임(c), i: i }; }).sort(function (a, b) { return (a.z - b.z) || (a.i - b.i); });
-    for (var k = 0; k < 직속.length; k++) {
-      var c = 직속[k].c;
-      if (!그려지나(c, L)) continue;
-      var 묶 = 묶음속성(c.style); if (묶) return { 옛길: 묶 + ' (' + c.className + ')' };
+  /* ★ 상자 계획 — 판 직속(유닛 상자·맵 아이템) 하나 안의 판들: 그림 원천·크기·반복·자름·밝기·쌓임(행렬 빼고) · 못 그리면 { 옛길 }
+   *   변화 관찰 번호(자기 _gp판 · 아래 _gp아래)가 그대로면 지난 계획을 다시 쓴다 — 카메라가 움직여 판의 --w 가 바뀌어도 상자 안은 그대로라
+   *   장마다 행렬과 상자 안 앞뒤 차례만 새로 센다 (11-26 2-4A 스크롤 휴대폰 흉내: 웹 요소를 숨기면 스타일 다시 계산 723→47ms 인데 장마다 처음부터 훑어 그 몫을 다 먹었다) */
+  function 상자계획(c, L, R) {
       var 안 = [c].concat(Array.prototype.slice.call(c.querySelectorAll('*'))), 판목 = [];
       for (var j = 0; j < 안.length; j++) {
         var e = 안[j];
@@ -525,21 +527,37 @@
           원천 = x.im; 부드럽게 = st.imageRendering !== 'pixelated' && !(e.closest && e.closest('[style*="pixelated"]'));
         } else if (색) { 원천 = 색캔버스(색); if (!원천) return { 옛길: '배경색 꼴 (' + 색 + ')' }; mw = 크.w; mh = 크.h; 부드럽게 = false; }
         else continue;
-        var 행 = 행렬(e, R); if (행.없음) return { 옛길: '행렬 ' + 행.없음 };
-        /* 상자 안 앞뒤 = 상자 기준 판의 z(앞으로 띄운 양) — ☠ 처음엔 판 가운데 점 깊이로 갈라 틀렸다: 세운 판은 위쪽일수록 멀어 머리 위 턴 마커(translateZ 1px)가 몸 뒤로 갔다(11-25 1-7) */
+                /* 상자 안 앞뒤 = 상자 기준 판의 z(앞으로 띄운 양) — ☠ 처음엔 판 가운데 점 깊이로 갈라 틀렸다: 세운 판은 위쪽일수록 멀어 머리 위 턴 마커(translateZ 1px)가 몸 뒤로 갔다(11-25 1-7) */
         var 판z = 0;
         if (입체(c) && e !== c) { var 상대 = 상자기준(e, c, R); if (!상대) return { 옛길: '상자 안 판이 상자와 나란하지 않음 (' + e.className + ')' }; 판z = 상대.z; }
         var 자름 = 자름구하기(e, c, R); if (자름 === false) return { 옛길: '잘라내기를 판 좌표로 못 옮김 (' + e.className + ')' };
         /* 제 층 — 크롬은 변환이 걸린 판(또는 판 직속)만 따로 합성하고 그 층 바깥 테두리만 섞는다 · 변환 없이 상자 안에 든 캔버스는 상자 층에 함께 그려져 테두리 섞기 없음
          *   (11-25 2-4A: 모든 판 테두리를 섞자 말 몸 캔버스 이음매마다 줄이 생겨 차이 532 → 2,956) */
         var 국e = 국소(e, e.parentElement, 크, R), 제층 = e.parentElement === L || (국e.m && !국e.m.isIdentity);
-        판목.push({ e: e, 원천: 원천, 부드럽게: 부드럽게, mw: mw, mh: mh, 반복: 반복, m: 행.m, w: 크.w, h: 크.h, 판z: 판z, 쌓: 판안쌓임(e, c), 차례: j, 자름: 자름, 제층: 제층, 밝: 밝기곱(e, L), 자리px: 자리px });
+        판목.push({ e: e, 원천: 원천, 부드럽게: 부드럽게, mw: mw, mh: mh, 반복: 반복, w: 크.w, h: 크.h, 판z: 판z, 쌓: 판안쌓임(e, c), 차례: j, 자름: 자름, 제층: 제층, 밝: 밝기곱(e, L), 자리px: 자리px });
       }
-      if (입체(c) && 판목.length > 1) {
+      return { 판들: 판목, 입체: 입체(c) };
+  }
+  function 그릴것(R) {
+    var L = 판(R), 목 = [], 직속 = Array.prototype.slice.call(L.children);
+    var 담기 = !root.__유닛GPU계획끔 && 관찰 && 관찰판 === L, 세키 = 세대머리 + 관찰세대 + ':' + R.host.className + ':';   /* host 클래스(3D 숨김 규칙 .g2-3d맵 …)도 판 보임에 기댄다 — 관찰 밖이라 열쇠에 */
+    직속 = 직속.map(function (c, i) { return { c: c, z: 쌓임(c), i: i }; }).sort(function (a, b) { return (a.z - b.z) || (a.i - b.i); });
+    for (var k = 0; k < 직속.length; k++) {
+      var c = 직속[k].c;
+      var 열 = 담기 ? 세키 + (c._gp판 | 0) + ':' + (c._gp아래 | 0) : null, 계 = c._gp계;
+      if (!(계 && 열 !== null && 계.열쇠 === 열)) {
+        if (!그려지나(c, L)) { 계 = { 숨음: true }; }
+        else { var 묶 = 묶음속성(c.style); if (묶) return { 옛길: 묶 + ' (' + c.className + ')' }; 계 = 상자계획(c, L, R); if (계.옛길) return 계; }
+        계.열쇠 = 열; if (열 !== null) c._gp계 = 계;
+      }
+      if (계.숨음) continue;
+      var 판목 = [];
+      for (var j = 0; j < 계.판들.length; j++) { var d = 계.판들[j], 행 = 행렬(d.e, R); if (행.없음) return { 옛길: '행렬 ' + 행.없음 }; var p = Object.create(d); p.m = 행.m; 판목.push(p); }
+      if (계.입체 && 판목.length > 1) {
         /* 상자의 +z 가 카메라 쪽인가 — 상자 원점에서 z 로 1 나간 점이 화면 w 가 작으면(가까우면) +z 가 앞 */
         var 상행 = 행렬(c, R); if (상행.없음) return { 옛길: '행렬 ' + 상행.없음 };
         var w0 = 상행.m.transformPoint({ x: 0, y: 0, z: 0, w: 1 }).w, w1 = 상행.m.transformPoint({ x: 0, y: 0, z: 1, w: 1 }).w, 앞쪽 = w1 < w0 ? 1 : -1;
-        판목.sort(function (a, b) { var d = 앞쪽 * (a.판z - b.판z); if (Math.abs(d) > 1e-6) return d; return 쌓비교(a.쌓, b.쌓) || (a.차례 - b.차례); });
+        판목.sort(function (a, b) { var dd = 앞쪽 * (a.판z - b.판z); if (Math.abs(dd) > 1e-6) return dd; return 쌓비교(a.쌓, b.쌓) || (a.차례 - b.차례); });
       } else 판목.sort(function (a, b) { return 쌓비교(a.쌓, b.쌓) || (a.차례 - b.차례); });
       for (var q = 0; q < 판목.length; q++) 목.push(판목[q]);
     }
@@ -576,6 +594,24 @@
       return false;
     }
   }
+  /* 이미 숨긴 판 위로 미리보기가 열리는 경우 — 핸들을 건 바로 다음 줄에서 syncOwner → 옆면 마스크 첫 sync 가 «동기로» 판 visibility 를 본다
+   *   (map3d_mapx_building_transaction.js:1422 걸기 → 1426 syncOwner → map3d_building_preview.js:6202 sync · Codex 5단계 재검수 «꼭»)
+   *   ⇒ 렌더러의 그 칸에 값이 들어오는 순간 판을 되살리고 GPU 캔버스를 감춘다(공유 모듈은 안 고침 · 값은 그대로 담고 돌려줌) */
+  function 미리보기감시(R) {
+    if (!R || R._gp미리보기감시 || R._gp미리보기감시실패) return;
+    var 값 = R._map3dMapxBuildingPreview;
+    try {
+      Object.defineProperty(R, '_map3dMapxBuildingPreview', { configurable: true, enumerable: true,
+        get: function () { return 값; },
+        set: function (v) {
+          값 = v;
+          if (!v) return;
+          var L = 판(R); if (L && L._유닛GPU감춤) { L.style.visibility = ''; L._유닛GPU감춤 = false; }
+          if (층 && 층.cv) { 층.cv.style.display = 'none'; 층.마지막 = '건물 미리보기(mapx) 열림'; }
+        } });
+      R._gp미리보기감시 = true;
+    } catch (e감시) { R._gp미리보기감시실패 = true; }   /* 걸지 못하면 숨기지 않는다 — 그리기안이 옛 길로 (Codex 5단계 3회차 권함) */
+  }
   function 그리기안(R) {
     R = R || root.R;
     var L = 판(R), 켬 = !!root.__유닛GPU그림 && 쓸까(R);
@@ -586,6 +622,10 @@
     var 옛 = function (까닭) { 층.마지막 = 까닭; 층.cv.style.display = 'none'; if (L._유닛GPU감춤) { L.style.visibility = ''; L._유닛GPU감춤 = false; } return false; };
     if (층.실패) return 옛('GPU 준비 실패: ' + 층.실패);
     if (층.잃음 || 층.gl.isContextLost()) return 옛('GPU 문맥 잃음');
+    /* 5단계 — mapx 건물 미리보기가 열려 있으면 숨기지 않는다: 그 옆면 마스크가 판 행판의 계산된 visibility 를 보고 hidden 이면 «행판이 사라졌다»며
+     *   미리보기를 통째로 닫는다(map3d_building_preview.js:6132 sync → map3d_mapx_building_transaction.js:1173 close · Codex 5단계 «꼭» 1) — 공유 모듈은 안 고치고 그 동안 옛 길 */
+    if (R._map3dMapxBuildingPreview) return 옛('건물 미리보기(mapx) 열림');
+    미리보기감시(R); if (R._gp미리보기감시실패) return 옛('미리보기 감시를 못 걸음');
     /* ★ 6단계 앞당김 — 판(spriteLayer)·host 에 바뀐 것이 없으면 지난 장 판 목록·행렬을 그대로 쓴다(캔버스 그림만 다시 올림)
      *   (11-25 1-7 실측: 한 번 그리기 2.0ms 중 그림 올리기 0.23 · 나머지는 요소 훑기·스타일 읽기·행렬 · 휴대폰 흉내 1-1 이벤트 표시가 옛 길보다 1.5~2ms 길었다)
      *   바뀜 = 관찰자 기록(속성·자식·하위 전부 · takeRecords 로 그 자리에서) · host 크기 · 지난 장이 옛 길 · 끄기 __유닛GPU다시씀끔 */
