@@ -49,10 +49,45 @@
     if (!(h >= 0)) h = st.height !== '' && st.height !== 'auto' ? NaN : e.tagName === 'CANVAS' ? e.height : e.tagName === 'IMG' ? (+e.getAttribute('height') || e.naturalHeight) : NaN;
     return { w: w, h: h };
   }
-  /* 변환 문자열 → DOMMatrix (var 없는 것만 · DOMMatrix 가 % 를 못 받으면 모름) */
+  /* ★ 가벼운 4×4 행렬 «행» — DOMMatrix 와 같은 쓰임새(m11~m44 · multiply · translate · transformPoint · toFloat32Array · isIdentity)
+   *   ☠ DOMMatrix 는 셈 한 번마다 브라우저 바깥 객체를 새로 만들어 무겁다 — 2-4A 스크롤 휴대폰 흉내에서 계산식 재기(A 33~41ms)가
+   *     브라우저 강제 배치(A0 26~30ms)보다 무거웠다(11-26) · 글자 풀이만 DOMMatrix 로 한 번 하고 담는다
+   *   m{열}{행} — DOMMatrix 와 같은 이름 · a[(열−1)×4 + (행−1)] (열 우선 · toFloat32Array 차례와 같음) */
+  function 행(a) { this.a = a || new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]); }
+  (function () {
+    for (var c = 1; c <= 4; c++) for (var r = 1; r <= 4; r++) (function (i) {
+      Object.defineProperty(행.prototype, 'm' + c + r, { get: function () { return this.a[i]; }, set: function (v) { this.a[i] = v; } });
+    })((c - 1) * 4 + (r - 1));
+  })();
+  행.에서 = function (d) { return new 행(new Float64Array(d.toFloat64Array())); };
+  행.prototype.multiply = function (B) {   /* this × B */
+    var x = this.a, y = B.a, o = new Float64Array(16);
+    for (var c = 0; c < 4; c++) { var y0 = y[c * 4], y1 = y[c * 4 + 1], y2 = y[c * 4 + 2], y3 = y[c * 4 + 3];
+      o[c * 4] = x[0] * y0 + x[4] * y1 + x[8] * y2 + x[12] * y3; o[c * 4 + 1] = x[1] * y0 + x[5] * y1 + x[9] * y2 + x[13] * y3;
+      o[c * 4 + 2] = x[2] * y0 + x[6] * y1 + x[10] * y2 + x[14] * y3; o[c * 4 + 3] = x[3] * y0 + x[7] * y1 + x[11] * y2 + x[15] * y3; }
+    return new 행(o);
+  };
+  행.prototype.translate = function (tx, ty, tz) {   /* this × T(tx, ty, tz) */
+    tx = tx || 0; ty = ty || 0; tz = tz || 0; var x = this.a, o = new Float64Array(x);
+    for (var r = 0; r < 4; r++) o[12 + r] = x[r] * tx + x[4 + r] * ty + x[8 + r] * tz + x[12 + r];
+    return new 행(o);
+  };
+  행.prototype.transformPoint = function (p) {
+    var x = this.a, px = p.x || 0, py = p.y || 0, pz = p.z || 0, pw = p.w == null ? 1 : p.w;
+    return { x: x[0] * px + x[4] * py + x[8] * pz + x[12] * pw, y: x[1] * px + x[5] * py + x[9] * pz + x[13] * pw,
+             z: x[2] * px + x[6] * py + x[10] * pz + x[14] * pw, w: x[3] * px + x[7] * py + x[11] * pz + x[15] * pw };
+  };
+  행.prototype.toFloat32Array = function () { return new Float32Array(this.a); };
+  Object.defineProperty(행.prototype, 'isIdentity', { get: function () { var x = this.a; for (var i = 0; i < 16; i++) if (x[i] !== (i % 5 === 0 ? 1 : 0)) return false; return true; } });
+  /* 변환 문자열 → 행 (var 없는 것만 · DOMMatrix 가 % 를 못 받으면 모름) */
+  /* 글자 → 행렬 풀이를 담아 둔다 — 카메라가 움직이면 같은 --w 글자를 판마다 수십 번 다시 풀었다(6단계 앞당김 · 풀어 낸 행렬은 아무도 제자리에서 안 바꾼다) */
+  var 풀이표 = new Map(), 단위행렬 = null;
   function 변환(문) {
-    if (!문 || 문 === 'none') return new root.DOMMatrix();
-    try { return new root.DOMMatrix(문); } catch (e) { return null; }
+    if (!문 || 문 === 'none') return 단위행렬 || (단위행렬 = new 행());
+    var m = 풀이표.get(문); if (m !== undefined) return m;
+    try { m = 행.에서(new root.DOMMatrix(문)); } catch (e) { m = null; }
+    if (풀이표.size > 4000) 풀이표.clear();
+    풀이표.set(문, m); return m;
   }
   /* 요소 자신의 국소 변환(원점 둘레) — 평면 대열 고정 틀이면 변수로 합친다 */
   function 국소(e, 부모, 크, R) {
@@ -66,7 +101,7 @@
       var W = 변환(부모.style.getPropertyValue('--w').trim()), L = 변환(변('--loc') || 'none');
       if (!W || !L) return { 없음: '평면 틀 --w/--loc 풀이 못 함' };
       /* 고정 틀(render.js:6762) · 원점 0 0 */
-      return { m: new root.DOMMatrix().translate(-pl, -pt).multiply(W).translate(pl, pt).translate(ox, oy).multiply(L).translate(-ox, -oy) };
+      return { m: new 행().translate(-pl, -pt).multiply(W).translate(pl, pt).translate(ox, oy).multiply(L).translate(-ox, -oy) };
     }
     var X = 변환(문);
     if (!X) return { 없음: '변환 풀이 못 함: ' + String(문).slice(0, 60) };
@@ -74,7 +109,7 @@
     var o = (st.transformOrigin || '50% 50%').split(/\s+/);
     var ox2 = 원점값(o[0], 크.w), oy2 = 원점값(o[1] == null ? '50%' : o[1], 크.h), oz = o[2] != null ? 길이(o[2], 0) : 0;
     if (!(isFinite(ox2) && isFinite(oy2) && isFinite(oz))) return { 없음: '변환 원점 모름: ' + st.transformOrigin };
-    return { m: new root.DOMMatrix().translate(ox2, oy2, oz).multiply(X).translate(-ox2, -oy2, -oz) };
+    return { m: new 행().translate(ox2, oy2, oz).multiply(X).translate(-ox2, -oy2, -oz) };
   }
   /* 부모 안 자리 — 절대 배치(left/top + margin) · 정적이면 (0,0) 이되 앞에 정적 형제가 있으면 모름 */
   function 자리(e, 부모, R) {
@@ -106,8 +141,8 @@
     var 크 = 크기(부모, R), o = (st.perspectiveOrigin || '50% 50%').split(/\s+/);
     var px = 원점값(o[0], 크.w), py = 원점값(o[1] == null ? '50%' : o[1], 크.h);
     if (!(isFinite(px) && isFinite(py))) return { 없음: '원근 원점 모름' };
-    var P = new root.DOMMatrix(); P.m34 = -1 / d;
-    return { m: new root.DOMMatrix().translate(px, py).multiply(P).translate(-px, -py) };
+    var P = new 행(); P.m34 = -1 / d;
+    return { m: new 행().translate(px, py).multiply(P).translate(-px, -py) };
   }
   /* preserve-3d 가 실제로 서나 — 묶음 속성(filter·opacity<1·clip-path·mask·overflow·isolation·mix-blend-mode)이 있으면 CSS 규칙상 평면으로 풀린다
    *   (11-25 1단계 시험: 필살 중 시전자 상자의 filter:brightness(연출밝은유닛 render.js:6603)로 턴 마커 translateZ(1px) 가 사라져 2px 어긋남) */
@@ -123,12 +158,25 @@
     if (st.mixBlendMode && st.mixBlendMode !== 'normal') return false;
     return true;
   }
-  var 평면화 = (function () { var F = new root.DOMMatrix(); F.m33 = 0; return F; })();   /* z 를 버린다 — 평면(flat) 부모가 자식의 3D 를 제 판에 눕힐 때 */
+  var 평면화 = (function () { var F = new 행(); F.m33 = 0; return F; })();   /* z 를 버린다 — 평면(flat) 부모가 자식의 3D 를 제 판에 눕힐 때 */
 
   /* 묶음 — 쓰기가 끝난 «읽기 구간»에서만 요소별 행렬을 담아 다시 쓴다(부모 줄을 요소마다 처음부터 곱하지 않게 · 2단계 빠르기)
    *   묶음시작() 과 묶음끝() 사이에 스타일을 쓰면 안 된다 — 유닛띄우기 두 번째 고리·클릭 후보처럼 읽기만 하는 곳에서만 */
   var 묶음 = null;
-  function 묶음시작() { 묶음 = new Map(); }
+  /* 변화 관찰 — 판 안 요소의 속성(스타일·크기)이 바뀌면 그 요소에 «바뀐 차례» 번호(_gp판)를 찍는다 · 몫 담기의 열쇠
+   *   ☠ 처음엔 요소마다 cssText 전체를 글자로 엮어 열쇠로 썼다 — 브라우저가 매번 스타일을 글자로 풀어 행렬 함수가 스크롤 시간의 9% (11-26) */
+  /* 세대 — 모듈을 다시 실어도(시험 도구가 부품을 새로 넣음) 요소에 남은 옛 몫과 열쇠가 겹치지 않게 모듈마다 다른 머리 */
+  var 관찰 = null, 관찰판 = null, 판시각 = 0, 관찰세대 = 0, 세대머리 = Math.random().toString(36).slice(2) + '/';
+  function 변화받기(L) {
+    if (!L || !root.MutationObserver || root.__유닛GPU관찰끔) return;
+    /* ☠ 콜백을 빈 함수로 두면 마이크로태스크마다 기록이 콜백으로 넘어가 버려진다 — takeRecords 는 그 뒤 것만 준다(11-26 밝기 관문: 바꾼 filter 를 못 보고 옛 몫을 씀) ⇒ 콜백에서도 찍는다 */
+    if (관찰판 !== L) { if (관찰) 관찰.disconnect(); 관찰 = new root.MutationObserver(찍기); 관찰.observe(L, { attributes: true, subtree: true }); 관찰판 = L; 관찰세대++; }
+    찍기(관찰.takeRecords());
+  }
+  function 찍기(기록) {
+    for (var i = 0; i < 기록.length; i++) 기록[i].target._gp판 = ++판시각;
+  }
+  function 묶음시작() { 변화받기(판(root.R)); 묶음 = new Map(); }
   function 묶음끝() { 묶음 = null; }
 
   /** 요소 → { m, w, h } — m 은 요소 안 (x, y, 0, 1) 을 host 안 CSS px 동차 좌표로 (원근 나눔 전) · 부모 행렬 × 자기 몫(같은 곱 · 순서만 묶음) */
@@ -144,24 +192,40 @@
       var 판자리 = 자리(L, null, R);
       if (판자리.없음) return 판자리;
       if (L.style.transform && L.style.transform !== 'none') return { 없음: '판 자체 변환' };
-      앞 = { m: new root.DOMMatrix().translate(판자리.x, 판자리.y) };
+      앞 = { m: new 행().translate(판자리.x, 판자리.y) };
     } else {
       앞 = 행렬(부모, R);
       if (앞.없음) return 앞;
     }
     var M = 앞.m;
+    /* ★ 6단계 앞당김 — «자기 몫»(부모 공간 → 자기 공간: 원근·평면화 × 자리 × 국소)을 요소에 담아 둔다
+     *   열쇠 = 몫이 기대는 값 전부(자기 인라인 스타일 · 캔버스/그림 크기 · 부모 원근·원근 원점·크기·입체 · 판 바로 아래면 --w) — 같으면 곱셈 한 번
+     *   (11-25 2-4A 스크롤 휴대폰 흉내 프로파일: 계산식 재기가 26% · 유닛 20 명이 매 장 움직이면 몫을 매번 처음부터 풀었다)
+     *   정적 배치(형제에 기대는 자리)는 담지 않는다 · 끄기 __유닛GPU몫끔 */
+    var 담을까 = !root.__유닛GPU몫끔 && (e.style.position === 'absolute' || e.style.position === 'fixed');
+    if (!묶음) 변화받기(L);
+    var 몫열쇠 = !담을까 ? null : (관찰 && 관찰판 === L) ? 세대머리 + 관찰세대 + ':' + (e._gp판 | 0) + ':' + (부모._gp판 | 0) + (e.tagName === 'IMG' ? ':' + e.naturalWidth + 'x' + e.naturalHeight : '') : [e.style.cssText, e.tagName === 'CANVAS' ? e.width + 'x' + e.height : e.tagName === 'IMG' ? (e.getAttribute('width') || '') + 'x' + (e.getAttribute('height') || '') + '/' + e.naturalWidth + 'x' + e.naturalHeight : '',
+                부모.style.perspective, 부모.style.perspectiveOrigin, 부모 !== L && 입체(부모) ? 1 : 0, 부모.style.width, 부모.style.height, 부모 === L ? L.style.getPropertyValue('--w') : ''].join('|');
+    var 담 = e._gp몫;
+    if (담 && 담.열쇠 === 몫열쇠 && 몫열쇠 !== null) {
+      if (담.없음) return 담.없음;
+      var 결0 = { m: M.multiply(담.몫), w: 담.w, h: 담.h };
+      if (묶음) 묶음.set(e, 결0);
+      return 결0;
+    }
     var 원 = 원근(부모, R);
     if (원 && 원.없음) return 원;
     if (원 && 부모 !== L && !입체(부모)) return { 없음: '원근과 평면화를 함께 가진 부모' };   /* 지금 구조엔 없음 — 들어오면 옛 길 (Codex 1단계) */
-    if (원) M = M.multiply(원.m);
-    else if (부모 !== L && !입체(부모)) M = M.multiply(평면화);
+    var 앞몫 = 원 ? 원.m : (부모 !== L && !입체(부모)) ? 평면화 : null;
     var 자 = 자리(e, 부모, R);
     if (자.없음) return 자;
     var 크 = 크기(e, R);
     if (!(크.w >= 0 && 크.h >= 0)) return { 없음: '크기 모름: ' + e.tagName + ' ' + e.className };
     var 국 = 국소(e, 부모, 크, R);
     if (국.없음) return 국;
-    var 결 = { m: M.translate(자.x, 자.y).multiply(국.m), w: 크.w, h: 크.h };
+    var 몫 = (앞몫 ? 앞몫.translate(자.x, 자.y) : new 행().translate(자.x, 자.y)).multiply(국.m);
+    if (몫열쇠 !== null) e._gp몫 = { 열쇠: 몫열쇠, 몫: 몫, w: 크.w, h: 크.h };
+    var 결 = { m: M.multiply(몫), w: 크.w, h: 크.h };
     if (묶음) 묶음.set(e, 결);
     return 결;
   }
@@ -169,7 +233,7 @@
   function 꼭짓점(e, R) {
     var r = 행렬(e, R);
     if (r.없음) return r;
-    var 점 = [[0, 0], [r.w, 0], [0, r.h], [r.w, r.h]].map(function (p) { var q = r.m.transformPoint(new root.DOMPoint(p[0], p[1], 0, 1)); return q.w > 1e-9 ? [q.x / q.w, q.y / q.w] : null; });
+    var 점 = [[0, 0], [r.w, 0], [0, r.h], [r.w, r.h]].map(function (p) { var q = r.m.transformPoint({ x: p[0], y: p[1], z: 0, w: 1 }); return q.w > 1e-9 ? [q.x / q.w, q.y / q.w] : null; });
     return 점.some(function (p) { return !p; }) ? { 없음: '카메라 뒤' } : 점;
   }
 
@@ -282,14 +346,22 @@
     while ((m = re.exec(글))) 목.push(m[1]);
     숨김꼴 = 목; return 목;
   }
-  function 그려지나(e, L) {
-    var 꼴 = 숨김꼴들();
-    for (var n = e; n && n !== L; n = n.parentElement) {
-      var st = n.style;
-      if (st.display === 'none' || st.visibility === 'hidden') return false;
-      for (var i = 0; i < 꼴.length; i++) if (n.classList.contains(꼴[i])) return false;
-    }
+  /* 보이나 — 6단계 앞당김: 숨김 클래스를 Set 으로 · 요소가 가진 클래스만 대 본다 · 한 번 훑는 동안(보임표) 조상 판정을 다시 쓴다
+   *   (11-25 프로파일: 새로 훑기의 27% 가 조상마다 숨김 클래스 목록 전체를 classList.contains 로 대 보던 것) */
+  var 숨김집합 = null, 보임표 = null;
+  function 제보임(n) {
+    var st = n.style;
+    if (st.display === 'none' || st.visibility === 'hidden') return false;
+    var 집 = 숨김집합; if (!집) { 집 = new Set(숨김꼴들()); if (숨김꼴) 숨김집합 = 집; }   /* 규칙 스타일을 실제로 읽었을 때만 담는다 */
+    if (집.size) { var cl = n.classList; for (var i = 0; i < cl.length; i++) if (집.has(cl[i])) return false; }
     return true;
+  }
+  function 그려지나(e, L) {
+    if (!e || e === L) return true;
+    if (보임표) { var v = 보임표.get(e); if (v !== undefined) return v; }
+    var r = 제보임(e) && (e.parentElement === L || 그려지나(e.parentElement, L));
+    if (보임표) 보임표.set(e, r);
+    return r;
   }
   /* clip-path 'inset(t r b l)' (px · 1~4 값 · round 없음) → [t, r, b, l] · 못 풀면 null */
   function 자름꼴(글) {
@@ -346,6 +418,7 @@
       var 놓기 = gl.getExtension('WEBGL_lose_context'); if (놓기) 놓기.loseContext();
     }
     if (x.cv && x.cv.parentNode) x.cv.parentNode.removeChild(x.cv);
+    if (x.관) x.관.disconnect();
   }
   function 층만들기(R) {
     if (층 && 층.R === R && !층.다시 && (층.cv.isConnected || !층.그린적)) return 층;
@@ -395,8 +468,12 @@
     if (!v) { t = gl.createTexture(); v = { t: t }; 층.판텍.set(키, v); }
     v.장 = 층.장;
     gl.bindTexture(gl.TEXTURE_2D, t);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, 원천);   /* 3단계: 장마다 올림(바뀜 알림은 6단계) */
+    /* 그림 파일(img·배경 그림)·단색 캔버스는 안 바뀐다 — 한 번만 올림 · 게임 캔버스는 내용이 바뀌므로 장마다 */
+    if (!(v.올림 && (원천.tagName !== 'CANVAS' || 원천._고정))) {
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, 원천);
+      v.올림 = true;
+    }
     var f = 부드럽게 ? gl.LINEAR : gl.NEAREST;
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
     var w = 반복 ? gl.REPEAT : gl.CLAMP_TO_EDGE;
@@ -409,7 +486,7 @@
     var c = 색표.get(색); if (c) return c;
     if (색표.size > 2048) 색표.clear();
     c = root.document.createElement('canvas'); c.width = c.height = 1;
-    var g = c.getContext('2d'); if (!g) return null; g.fillStyle = 색; g.fillRect(0, 0, 1, 1);
+    var g = c.getContext('2d'); if (!g) return null; g.fillStyle = 색; g.fillRect(0, 0, 1, 1); c._고정 = true;
     색표.set(색, c); return c;
   }
   function 쌓임(e) { var z = parseFloat(e.style.zIndex); return isFinite(z) ? z : 0; }
@@ -461,7 +538,7 @@
       if (입체(c) && 판목.length > 1) {
         /* 상자의 +z 가 카메라 쪽인가 — 상자 원점에서 z 로 1 나간 점이 화면 w 가 작으면(가까우면) +z 가 앞 */
         var 상행 = 행렬(c, R); if (상행.없음) return { 옛길: '행렬 ' + 상행.없음 };
-        var w0 = 상행.m.transformPoint(new root.DOMPoint(0, 0, 0, 1)).w, w1 = 상행.m.transformPoint(new root.DOMPoint(0, 0, 1, 1)).w, 앞쪽 = w1 < w0 ? 1 : -1;
+        var w0 = 상행.m.transformPoint({ x: 0, y: 0, z: 0, w: 1 }).w, w1 = 상행.m.transformPoint({ x: 0, y: 0, z: 1, w: 1 }).w, 앞쪽 = w1 < w0 ? 1 : -1;
         판목.sort(function (a, b) { var d = 앞쪽 * (a.판z - b.판z); if (Math.abs(d) > 1e-6) return d; return 쌓비교(a.쌓, b.쌓) || (a.차례 - b.차례); });
       } else 판목.sort(function (a, b) { return 쌓비교(a.쌓, b.쌓) || (a.차례 - b.차례); });
       for (var q = 0; q < 판목.length; q++) 목.push(판목[q]);
@@ -472,7 +549,7 @@
   function 상자기준(e, 상자, R) {
     var 길 = [];
     for (var n = e; n && n !== 상자; n = n.parentElement) 길.unshift(n);
-    var M = new root.DOMMatrix(), 부모 = 상자;
+    var M = new 행(), 부모 = 상자;
     for (var i = 0; i < 길.length; i++) {
       var 나 = 길[i];
       if (부모 !== 상자 && !입체(부모)) M = M.multiply(평면화);
@@ -509,8 +586,21 @@
     var 옛 = function (까닭) { 층.마지막 = 까닭; 층.cv.style.display = 'none'; if (L._유닛GPU감춤) { L.style.visibility = ''; L._유닛GPU감춤 = false; } return false; };
     if (층.실패) return 옛('GPU 준비 실패: ' + 층.실패);
     if (층.잃음 || 층.gl.isContextLost()) return 옛('GPU 문맥 잃음');
-    var 결; 묶음시작();
-    try { 결 = 그릴것(R); } finally { 묶음끝(); }
+    /* ★ 6단계 앞당김 — 판(spriteLayer)·host 에 바뀐 것이 없으면 지난 장 판 목록·행렬을 그대로 쓴다(캔버스 그림만 다시 올림)
+     *   (11-25 1-7 실측: 한 번 그리기 2.0ms 중 그림 올리기 0.23 · 나머지는 요소 훑기·스타일 읽기·행렬 · 휴대폰 흉내 1-1 이벤트 표시가 옛 길보다 1.5~2ms 길었다)
+     *   바뀜 = 관찰자 기록(속성·자식·하위 전부 · takeRecords 로 그 자리에서) · host 크기 · 지난 장이 옛 길 · 끄기 __유닛GPU다시씀끔 */
+    /* 콜백이 «바뀜» 표를 세운다 — 빈 콜백이면 마이크로태스크 때 기록이 버려져 바뀐 장을 옛 목록으로 그렸다(위 찍기와 같은 함정) */
+    if (!층.관 && root.MutationObserver) { var 층0 = 층; 층.관 = new root.MutationObserver(function () { 층0.바뀜 = true; }); 층.관.observe(L, { attributes: true, childList: true, subtree: true }); 층.관.observe(R.host, { attributes: true }); 층.바뀜 = true; }
+    var 호0 = R.호스트크기 ? R.호스트크기() : { w: R.host.clientWidth, h: R.host.clientHeight }, 크키 = 호0.w + 'x' + 호0.h + '@' + (root.devicePixelRatio || 1);
+    var 기록 = 층.관 ? 층.관.takeRecords() : [1]; if (층.바뀜) { 기록 = 기록.length ? 기록 : [1]; 층.바뀜 = false; }
+    var 결;
+    if (!root.__유닛GPU다시씀끔 && 층.목 && 층.목L === L && 층.크키 === 크키 && !기록.length) { 결 = { 목: 층.목 }; 층.다시씀 = (층.다시씀 | 0) + 1; }
+    else {
+      묶음시작(); 보임표 = new Map();
+      try { 결 = 그릴것(R); } finally { 묶음끝(); 보임표 = null; }
+      if (층.관) 층.관.takeRecords();   /* 훑는 동안 우리가 쓴 것(없어야 함)까지 비운다 */
+      층.목 = 결.옛길 ? null : 결.목; 층.목L = L; 층.크키 = 크키; 층.새로씀 = (층.새로씀 | 0) + 1;
+    }
     if (결.옛길) return 옛(결.옛길);
     var 호 = R.호스트크기 ? R.호스트크기() : { w: R.host.clientWidth, h: R.host.clientHeight }, 배 = root.devicePixelRatio || 1;
     var W = Math.max(1, Math.round(호.w * 배)), H = Math.max(1, Math.round(호.h * 배)), cv = 층.cv, gl = 층.gl;
@@ -533,7 +623,7 @@
       gl.uniformMatrix4fv(층.위.M, false, p.m.toFloat32Array());
       gl.uniform2f(층.위.크, p.w, p.h); gl.uniform2f(층.위.무늬, p.mw, p.mh); gl.uniform1i(층.위.반복, 가득 ? 2 : p.반복);
       /* 테두리 섞기 — 화면(장치 px) 네 꼭짓점으로 변 거리식 · 넓히는 양 = 판 단위로 장치 2px 남짓(원근으로 줄어든 변 기준) */
-      var 점 = [[0, 0], [p.w, 0], [p.w, p.h], [0, p.h]].map(function (q) { var r = p.m.transformPoint(new root.DOMPoint(q[0], q[1], 0, 1)); return [r.x / r.w * 배, H - r.y / r.w * 배]; });
+      var 점 = [[0, 0], [p.w, 0], [p.w, p.h], [0, p.h]].map(function (q) { var r = p.m.transformPoint({ x: q[0], y: q[1], z: 0, w: 1 }); return [r.x / r.w * 배, H - r.y / r.w * 배]; });
       var 쓸섞기 = 섞기켬 && p.제층 && (가득 || p.반복 === 1) && 점.every(function (q) { return isFinite(q[0]) && isFinite(q[1]); });
       if (쓸섞기) {
         var 가x = (점[0][0] + 점[1][0] + 점[2][0] + 점[3][0]) / 4, 가y = (점[0][1] + 점[1][1] + 점[2][1] + 점[3][1]) / 4, 최가로 = Infinity, 최세로 = Infinity;   /* 짧은 변(원근으로 줄어든 쪽) 기준 — 넓힘이 모자라지 않게 */
@@ -556,7 +646,7 @@
     if (L.style.visibility !== 'hidden') { L.style.visibility = 'hidden'; L._유닛GPU감춤 = true; }
     return true;
   }
-  function 상태() { return 층 ? { 마지막: 층.마지막 || '', 실패: 층.실패 || '', 잃음: !!층.잃음, 텍스처: 층.판텍 ? 층.판텍.size : 0 } : null; }
+  function 상태() { return 층 ? { 마지막: 층.마지막 || '', 실패: 층.실패 || '', 잃음: !!층.잃음, 텍스처: 층.판텍 ? 층.판텍.size : 0, 다시씀: 층.다시씀 | 0, 새로씀: 층.새로씀 | 0 } : null; }
   function 외곽() { return 층 && 층.외곽 ? 층.외곽 : []; }
 
   /* 장마다 다시 그림 — 캔버스 그림이 반영(apply) 없이 바뀌어도 따라가게 (3단계 · 끄면 한 번 되돌리고 멈춤) */

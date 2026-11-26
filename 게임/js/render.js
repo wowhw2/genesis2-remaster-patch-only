@@ -6661,7 +6661,7 @@ function 평면판되돌리기(e) {
   if (e._합친tf == null) return;
   if (e.style.transform === e._합친tf) e.style.transform = e._국소tf || '';
   if (e._국소원점 != null) e.style.transformOrigin = e._국소원점;
-  ['--pl', '--pt', '--ox', '--oy', '--loc'].forEach(function (k) { e.style.removeProperty(k); });
+  ['--pl', '--pt', '--ox', '--oy', '--loc', '--w'].forEach(function (k) { e.style.removeProperty(k); });
   e._평면l = e._평면t = e._평면ox = e._평면oy = e._평면loc = undefined;   /* 변수를 지웠으니 «이미 씀» 기억도 지운다 — 다시 켤 때 새로 쓴다 */
   e._합친tf = null; e._국소tf = null; e._국소원점 = null; e._합친키 = null; e._합친세계 = null;
 }
@@ -6761,9 +6761,19 @@ Renderer.prototype._평면대열적용 = function (worldTf) {
 /* 고정 틀 — «세계 변환(--w) × 제자리(--pl·--pt) × 제 원점(--ox·--oy) 둘레 국소 변환(--loc)» · 모든 자식이 같은 문자열이라 한 번 정규화해 견준다 */
 var 평면틀 = 'translate(calc(-1 * var(--pl)), calc(-1 * var(--pt))) var(--w) translate(var(--pl), var(--pt)) ' +
              'translate(var(--ox), var(--oy)) var(--loc) translate(calc(-1 * var(--ox)), calc(-1 * var(--oy)))';
+/* ★ 정본 456 (사장님 11-26 «무거운 계산부터 줄임») — 판의 세계 변환 --w 는 «물려주지 않음»으로 등록하고, 판 바로 아래 요소만 --w: inherit 로 받는다
+ *   --w 를 읽는 것은 위 고정 틀(판 직속 요소 자기 변환)뿐이다(저장소 전수 grep) — 그런데 사용자 변수는 기본이 물려받기라 카메라가 움직일 때마다
+ *   판 아래 모든 요소(유닛 상자 안쪽까지)가 스타일을 다시 셈했다(11-26 크롬 추적 2-4A 스크롤: 한 번 평균 101 요소 = 판 직속 23 + 그 아래 110)
+ *   등록은 되돌릴 수 없다 — 견줘 재려면 페이지를 열기 전에 window.__판변수물려줌 = true */
+var 판변수등록됨 = (function () {
+  var C = root.CSS;
+  if (root.__판변수물려줌 || !C || typeof C.registerProperty !== 'function') return false;
+  try { C.registerProperty({ name: '--w', syntax: '*', inherits: false }); return true; } catch (e) { return false; }
+})();
 function 평면한요소(e, worldTf) {
   var st = e.style;
   /* 변환·위치·크기가 그대로면 할 일 없음 — 관찰기가 우리 쓰기에 다시 불러도 여기서 멈춘다 (세계 변환은 판의 --w 라 여기서 안 본다) */
+  if (판변수등록됨 && st.getPropertyValue('--w') !== 'inherit') st.setProperty('--w', 'inherit');   /* --w 를 물려주지 않게 등록했으니 판 직속만 받는다(위 판변수등록됨) */
   var 키 = st.left + '|' + st.top + '|' + st.width + '|' + st.height + '|' + st.marginLeft + '|' + st.marginTop;
   /* ★ transform 문자열 읽기는 한 번에 2.4µs(헤드리스 실측) — 한 번만 읽어 쓴다 (2026-10-08 성능) */
   var 지금tf = st.transform, 지금원점 = st.transformOrigin;
@@ -6814,7 +6824,26 @@ Renderer.prototype._평면한요소 = function (e) {
 
 /** 월드 스프라이트를 현재 원본 가림 순서에 맞춰 정렬한다. */
 Renderer.prototype._스프라이트대열정렬 = function () {
-  var all = this.objEls.slice(), self = this;
+  var self = this;
+  /* ★ 정본 456 (사장님 11-26 «무거운 계산부터 줄임») — 3D 동안 CSS 로 감춘 맵 사물(리마스터3D 규칙 .g2-3d맵 .g2-rowflat 등 · 3D 장면이 대신 그림)은
+   *   spriteLayer 밖 숨김 보관함(display:none)으로 옮긴다 — 판에 남으면 카메라가 움직일 때마다 판의 --w(물려받는 사용자 변수)를 따라
+   *   보이지도 않으면서 장마다 스타일을 다시 셈했다(2-4A 스크롤 휴대폰 흉내 추적: 판 직속 247 중 224 가 감춘 사물 · 스타일 다시 계산 2초에 723ms →
+   *   떼어 내면 62ms · 그린 장 57 → 85) · display:none 부모 아래는 스타일 계산을 건너뛴다
+   *   3D 를 끄면(기울기·회전 0) 목록에 다시 들어가 아래 줄 세우기가 제자리에 끼운다 · «내림»(문라이트 등 _오브젝트내림) 중엔 건드리지 않는다 · 끄기 window.__3D숨김보관끔 */
+  var 뿌 = (typeof root !== 'undefined' && root) || (typeof window !== 'undefined' ? window : {});   /* 시험이 이 함수만 떼어 돌린다(map_item_draw_order 등) — root 가 없을 수 있다 */
+  var 숨김3D = !뿌.__3D숨김보관끔 && !뿌.__숨은사물도세움 && !this._오브젝트내림 && !뿌.__리마스터3D끄기 &&
+              !!(this.host && this.host.classList.contains('g2-3d맵') && this.cam && (this.cam.tilt || this.cam.rot) && this.spriteLayer && this.spriteLayer.parentNode);
+  var 보관 = this._3D숨김보관;
+  if (숨김3D && !보관 && typeof document !== 'undefined') {
+    보관 = this._3D숨김보관 = document.createElement('div');
+    보관.className = 'g2-3d숨김보관'; 보관.style.display = 'none';
+    this.spriteLayer.parentNode.appendChild(보관);
+  }
+  var all = [];
+  this.objEls.forEach(function (e) {
+    if (숨김3D && e && (e.parentNode === self.spriteLayer || e.parentNode === 보관) && 사물3D숨김인가(e)) { if (e.parentNode !== 보관) 보관.appendChild(e); return; }
+    all.push(e);
+  });
   /* ★★★★★ **맵 아이템(상자·아이콘)도 차례에 넣는다** — 원본 행 고리 0x12BEE 안에서 물체 → 아이템(0x12C44 아이콘 · 0x12CE3 상자) → 유닛 (2026-10-05)
    *   ☠ 빠져 있어 상자가 판 맨 뒤에 붙은 채 남아, 기울기 평면 방식에서 캐릭터 앞에 그려졌다
    *     (사장님 「상자와 열린상자가 캐릭터 앞으로 오는 문제가 있어. 캐릭터 아래로 내려가야해」)
@@ -7852,9 +7881,16 @@ function 유닛그림자그리기(renderer, u, box, 층들, ox, oy) {
  * mapOf 결과와 상자 경계를 그대로 받아 좌표 계산을 새로 만들지 않는다. */
 function 유닛최종배치(renderer, box, 위치, 경계, 발끝) {
   box._footY = 발끝;
-  box.style.transformOrigin = '50% ' + 발끝 + 'px';
+  var 원 = '50% ' + 발끝 + 'px', 판 = box.parentNode;
+  /* ★ 정본 456 (사장님 11-26 «무거운 계산부터 줄임») — 평면 대열 판 안이면 원점을 글자로 쓰지 않고 평면한요소가 쓰는 기억(_국소원점)만 바꾼다
+   *   ☠ 글자로 쓰면 평면한요소(판 관찰기)가 곧바로 --ox·--oy 로 옮기고 '0px 0px' 로 되돌려, 상자마다 apply 한 번에 스타일이 두 번 바뀌었다
+   *     (11-26 크롬 무효화 추적 2-4A 스크롤: 유닛최종배치·평면한요소 각 2초 2,312번 — 장마다 스타일 다시 계산 두 번) · 끄기 window.__원점되쓰기 */
+  var 평면 = !(typeof root !== 'undefined' && root && root.__원점되쓰기) && 판 && 판._평면tf && box._합친tf != null && box.style.transformOrigin === '0px 0px';
+  if (평면) { if (box._국소원점 !== 원) { box._국소원점 = 원; box._합친키 = null; } }
+  else box.style.transformOrigin = 원;
   renderer._빌보드놓기(box, 위치.x - 경계.ox,
                            위치.y - 경계.oy + 경계.h, 경계.h);
+  if (평면 && box._합친키 === null && renderer._평면한요소) renderer._평면한요소(box);   /* 바뀐 원점을 --ox·--oy 로 (빌보드가 아무것도 안 바꿔 관찰기가 안 불린 경우) */
 }
 
 /* 유닛 지형 표시 판정만 계산한다. DOM과 Renderer 인스턴스 상태를 쓰지 않는다.
