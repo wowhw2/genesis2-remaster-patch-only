@@ -106,7 +106,7 @@
       var 실패 = []; try { (performance.getEntriesByType('resource') || []).forEach(function (r) { if (r.responseStatus >= 400) 실패.push(r.responseStatus + ' ' + decodeURIComponent(String(r.name).replace(/^https?:\/\/[^/]+/, ''))); }); } catch (e) { }
       var 모든캔 = document.getElementsByTagName('canvas'), 합화소 = 0, 잃은 = 0; for (var ci = 0; ci < 모든캔.length; ci++) { 합화소 += 모든캔[ci].width * 모든캔[ci].height; }
       [].slice.call(document.querySelectorAll('.g2-sprite-layer canvas')).forEach(function (c) { try { var x = c.getContext('2d'); if (x && x.isContextLost && x.isContextLost()) 잃은++; } catch (e) { } });
-      return { 수: 키.length, 표본: 표본, 층: 층, 캔버스: 모든캔.length + '장 ' + (합화소 / 1e6).toFixed(1) + 'M화소', 유닛층잃은캔버스: 잃은, GPU끔: !!root.__유닛GPU끔, 보기3D: !!document.querySelector('.g2-3d맵'), GPU칠하기: root.G2PaletteGPU && G2PaletteGPU.상태 ? G2PaletteGPU.상태() : null, 유닛GPU층: root.G2유닛GPU층 && G2유닛GPU층.상태 ? { 켬: !!root.__유닛GPU그림, 판숨김: !!(R.spriteLayer && R.spriteLayer._유닛GPU감춤), 상태: G2유닛GPU층.상태() } : null, 받기실패: 실패.slice(-20) };
+      return { 수: 키.length, 표본: 표본, 층: 층, 캔버스: 모든캔.length + '장 ' + (합화소 / 1e6).toFixed(1) + 'M화소', 유닛층잃은캔버스: 잃은, GPU끔: !!root.__유닛GPU끔, 보기3D: !!document.querySelector('.g2-3d맵'), GPU칠하기: root.G2PaletteGPU && G2PaletteGPU.상태 ? G2PaletteGPU.상태() : null, 받기실패: 실패.slice(-20) };
     });
     o.모바일 = 모바일;
     o.메모리MB = 해(function () { return performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) + ' / ' + Math.round(performance.memory.jsHeapSizeLimit / 1048576) : null; });

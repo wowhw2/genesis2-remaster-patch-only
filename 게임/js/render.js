@@ -1488,12 +1488,23 @@ Renderer.prototype.스프라이트자산대기 = async function (no) {
  *     팔레트와 다르면 **그 파일만** 다시 굽는다. 인덱스 버퍼(`_usprRaw`)를 쥐고
  *     있으므로 **다시 읽지 않는다.**
  */
+function 같은색판(a, b) {   /* 정본 472 — 두 색판(바이트 배열)의 값이 모두 같은가 */
+  if (!a || !b || a.length !== b.length) return false;
+  for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
 Renderer.prototype._팔레트따라잡기 = function (file) {
   /* ☠ 연출 중(초필살 암전·필살 리맵)에는 유닛을 «리맵 전 팔레트»(_유닛쓸팔)로 굽는다 — 맵 팔레트(암전된 것)와 견주면 그릴 때마다
    *   유닛 그림을 암전 팔레트로 다시 구워 시전자·대상까지 어두워졌다 (2026-09-26 사장님 「시전자랑 타겟은 음영처리 안되어야한다고!」) */
   var 지금 = this._유닛쓸팔 || this._유닛팔레트();
   if (!지금 || !this._usprPal || !this._usprRaw) return false;
   if (!this._usprPal[file] || this._usprPal[file] === 지금) return false;
+  /* ★ 정본 472 — 값이 같은 색판이면 다시 굽지 않는다(이 파일의 색판 표만 새 객체로 바꿔 둔다)
+   *   ☠ 필살기 시작 암전(setPaletteMix(0, 0, …, 40, { css: true }))은 유닛에 «섞기 0% = 값이 똑같은 새 배열»을 준다 — 객체로만 견줘
+   *     켤 때·끌 때마다 모든 유닛 그림을 다시 지었다: GPU 색판 칠을 못 쓰는 기기는 CPU 로 통째로 다시 확대
+   *     (측정 창 9-6 · hq3x · CPU 길: 켬·끔 한 번에 화면 유닛 4.8~5.9ms · CPU 6배 느리게 47~53ms · 휴대폰 신고 «반영:유닛» 966~1085ms)
+   *   (사장님 11-26 「필살기 시전하자마자 딜레이(프리징) 생기는거 고쳐」) · 끄기 window.__색판값견줌끔 */
+  if (!root.__색판값견줌끔 && 같은색판(this._usprPal[file], 지금)) { this._usprPal[file] = 지금; return false; }
   if (typeof this._uspr[file] !== 'function' || !this._usprRaw[file]) return false;
   var _성 = root.G2성능, _팔0 = _성 ? performance.now() : 0;
   this._uspr[file] = 유닛공급자(this, file, 지금);
@@ -7945,8 +7956,36 @@ Renderer.prototype.clearUnitPresentation = function (units) {
   (units || []).forEach(function (u) { if (u) delete shown[u.id]; });
 };
 
+/* ★ 정본 456 — 반영 고리의 updateUnit 건너뛰기 지문 (apply 의 유닛 고리 주석)
+ *   공통: 반영마다 한 번 · null 이면 건너뛰기 안 함(꺼짐 · 3D 아님 등) */
+Renderer.prototype._유닛건너공통 = function () {
+  if (root.__유닛매번세움) return null;
+  var c = this.cam || {}, N = (root.G2Scaler && root.G2Scaler.N) ? root.G2Scaler.N() : 1, pal = this._유닛팔레트 ? this._유닛팔레트() : null;
+  var h = 0x811c9dc5; if (pal) for (var i = 0; i < pal.length; i++) { h ^= pal[i]; h = (h * 0x01000193) >>> 0; }
+  var 그 = null; try { 그 = ((root.__Opt && root.__Opt.cfg) || {})['그림자']; } catch (e) {}
+  return [c.tilt, c.rot, c.zoom, N, h, this.host && this.host.className, 그, this._map3dTerrainPreview ? 1 : 0, this.mapW, this.mapH].join(',') + '#';
+};
+Renderer.prototype._유닛입력지문 = function (u) {
+  var s = '';
+  for (var k in u) { var v = u[k], t = typeof v; if (t === 'number' || t === 'string' || t === 'boolean') s += '|' + v; else if (v === null) s += '|n'; else if (v === undefined) s += '|u'; }
+  var r = u.rider; if (r) s += '|r' + r.sprIndex + ':' + r.dir + ':' + r.motion;
+  var p = this._unitPresentation && this._unitPresentation[u.id]; if (p) for (var k2 in p) s += '|p' + k2 + '=' + p[k2];
+  /* 표시 보간(lerpT)은 빌보드 적용의 _보간값(직전 자리 _pl·_pg ↔ 지금 _left·_ground)에서만 쓴다 — 두 자리가 다를 때(움직이는 중)만 지문에 (11-26: 스크롤 중 lerpT 가 장마다 바뀌어 하나도 못 건너뜀) */
+  var 상 = this.unitEls && this.unitEls[u.id];
+  if (상) { s += '|L' + 상._pl + ',' + 상._left + ',' + 상._pg + ',' + 상._ground; if ((상._pl != null && 상._pl !== 상._left) || (상._pg != null && 상._pg !== 상._ground)) s += '|t' + this.lerpT; }
+  s += '|d' + !!(this._dying && this._dying[u.id]) + '|h' + !!(this._hidden && this._hidden[u.id]) + '|g' + (this._glow ? this._glow[u.id] : '');
+  return s;
+};
+/* 검사용 — 상자와 자손의 인라인 스타일 + 캔버스 크기 */
+function 유닛출력지문(b) {
+  if (!b) return '';
+  var s = b.style.cssText, 들 = b.querySelectorAll('*');
+  for (var i = 0; i < 들.length; i++) { var e = 들[i]; s += '|' + e.style.cssText; if (e.tagName === 'CANVAS') s += '#' + e.width + 'x' + e.height; }
+  return s;
+}
 /** 유닛 하나의 프레임·그림자·상태효과·최종 배치를 갱신한다. */
 Renderer.prototype.updateUnit = function (u) {
+  if (!this._유닛고리안) { var 상0 = this.unitEls && u && this.unitEls[u.id]; if (상0) 상0._입력지문 = null; }   /* 정본 456 — 고리 밖 부름은 다음 반영 건너뛰기를 막는다 */
   /* 원본은 0x287DD에서 화면을 그린 뒤 0x28802에서 모델을 민다.
    * 숫자 루프 중에는 대상의 직전 장 표시 상태만 투영하고 모델은 그대로 둔다. */
   var 표시 = this._unitPresentation && this._unitPresentation[u.id];
@@ -12104,9 +12143,7 @@ Renderer.prototype.screenOfRendered = function (u, dx, dy) {
   this._빌보드놓기(probe, lx, gy, 0);
   this._빌보드적용(probe);
 
-  /* 정본 456 2단계 — 스위치(window.__유닛GPU재기)가 켜지면 재는 점 자리를 계산식으로(유닛GPU층.js · 못 풀면 옛 길) */
-  var GP = root.G2유닛GPU층, r = (GP && GP.쓸까 && GP.쓸까(this)) ? GP.화면사각(probe, this) : null;
-  if (!r) r = probe.getBoundingClientRect();
+  var r = probe.getBoundingClientRect();
   return { x: (r.left - h.left) * 320 / h.width,
            y: (r.top - h.top) * 200 / h.height };
 };
@@ -13542,7 +13579,29 @@ Renderer.prototype._apply본 = function () {
    *   바로 아래 고리에서 다시 세우지 않는다 — 그 사이 바뀌는 것이 없어 같은 일을 두 번 했다(3D 면 감싼 세우기까지 두 번 · 11-26 2-4A 스크롤 프로파일 빌보드 14%)
    *   updateUnit 이 일찍 돌아간 상자(그림 아직)·목록 밖 상자는 그대로 세운다 · 끄기 window.__빌보드두번 */
   var 빌번 = this._빌장번 = (this._빌번 = (this._빌번 | 0) + 1);
-  this.b.units.forEach(function (u) { self.updateUnit(u); });
+  /* ★ 정본 456 (사장님 11-26 «① 멈추고 보존» — 유닛 많은 맵은 본체 계산 줄이기) — 입력 지문이 지난 반영과 같은 유닛은 updateUnit 을 건너뛴다
+   *   (휴대폰 흉내 18-1 유닛 78 스크롤: updateUnit 11,634번 중 웹 요소를 실제로 바꾼 것 12번 · 캔버스 0번 — 안 부르면 한 장 31~38 → 25~28ms)
+   *   지문 = 렌더러 공통(카메라 기울기·회전·확대 · 스케일러 · 유닛 팔레트 해시 · 3D 여부 · 그림자 설정) + 유닛의 숫자·글자 값 전부 · 상자 직전/지금 자리(다르면 lerpT) · 탑승자 · 표시 덮개 · 사망·숨김·발광
+   *   고리 밖에서 부른 updateUnit 은 그 상자 지문을 지운다(다음 반영은 반드시 다시 세움) · 끄기 __유닛매번세움 · 검사 __유닛건너검사(건너뛸 호출도 돌려 출력 지문을 견줌 → R._유닛건너셈)
+   *   검사(11-26 휴대폰 흉내): 18-1 스크롤·연출 32,090 · 적 차례 27,212 · 1-7·2-4A·7-3·1-10 × 기울기 45·0 약 7만 번 — 틀림 0 · 18-1 스크롤 한 장 31.5~31.8 → 25.5~27.0ms */
+  var 건공 = this._유닛건너공통();
+  this._유닛고리안 = true;
+  try {
+    this.b.units.forEach(function (u) {
+      if (건공 === null) { self.updateUnit(u); return; }
+      var 상 = self.unitEls && self.unitEls[u.id], 지 = 건공 + self._유닛입력지문(u);
+      if (상 && 상._입력지문 === 지) {
+        if (!root.__유닛건너검사) { 상._빌보드한번 = 빌번; return; }
+        var 전 = 유닛출력지문(상); self.updateUnit(u); var 후 = 유닛출력지문(self.unitEls[u.id]);
+        var 검 = self._유닛건너셈 || (self._유닛건너셈 = { 건너: 0, 틀림: 0, 예: [] }); 검.건너++;
+        if (전 !== 후) { 검.틀림++; if (검.예.length < 8) { var i = 0; while (i < 전.length && 전[i] === 후[i]) i++; 검.예.push(u.id + ' ' + 전.slice(Math.max(0, i - 30), i + 50) + ' ⇒ ' + 후.slice(Math.max(0, i - 30), i + 50)); } }
+        return;
+      }
+      self.updateUnit(u);
+      var 상2 = self.unitEls && self.unitEls[u.id];
+      if (상2 && (상2._layers || []).length) 상2._입력지문 = 지;   /* 그림이 아직(층 0)이면 지문을 안 남긴다 — 다음 반영에 다시 */
+    });
+  } finally { this._유닛고리안 = false; }
   this._빌장번 = 0;
   var 두번 = !!root.__빌보드두번;
   Object.keys(this.unitEls).forEach(function (k) { var e = self.unitEls[k]; if (!두번 && e && e._빌보드한번 === 빌번) return; self._빌보드적용(e); });
@@ -14340,11 +14399,9 @@ Renderer.prototype.유닛불투명픽셀인가 = function (u, clientX, clientY) 
   if (!box || box.style.display === 'none') return false;
   var L = box._layers || [];
   var boxed = false;
-  /* 정본 456 2단계 — 스위치가 켜지면 층 사각을 계산식으로(host 자리만 한 번 잼 · 못 풀면 옛 길) */
-  var GP = root.G2유닛GPU층, 새 = !!(GP && GP.쓸까 && GP.쓸까(this)), 호 = 새 ? this.host.getBoundingClientRect() : null;
   for (var i = L.length - 1; i >= 0; i--) {
     var e = L[i].el, m = L[i].meta;
-    var r = (새 && GP.화면사각(e, this, 호)) || e.getBoundingClientRect();
+    var r = e.getBoundingClientRect();
     if (!r.width || !r.height) continue;
     if (clientX < r.left || clientX >= r.right ||
         clientY < r.top || clientY >= r.bottom) continue;
@@ -14365,13 +14422,12 @@ Renderer.prototype.유닛불투명픽셀인가 = function (u, clientX, clientY) 
 Renderer.prototype.화면점유닛 = function (units, clientX, clientY) {
   if (!this.unitEls) return null;
   var best = null, bestZ = -Infinity;
-  var GP = root.G2유닛GPU층, 새 = !!(GP && GP.쓸까 && GP.쓸까(this)), 호 = 새 ? this.host.getBoundingClientRect() : null;   /* 정본 456 2단계 */
   for (var i = 0; i < units.length; i++) {
     var u = units[i];
     if (!u.alive) continue;
     var el = this.unitEls[u.id];
     if (!el || !this.유닛불투명픽셀인가(u, clientX, clientY)) continue;
-    var b = (새 && GP.화면사각(el, this, 호)) || el.getBoundingClientRect();
+    var b = el.getBoundingClientRect();
     var z = parseFloat(el.style.zIndex) || 0;
     var key = z * 100000 + b.bottom;
     if (key > bestZ) { bestZ = key; best = u; }

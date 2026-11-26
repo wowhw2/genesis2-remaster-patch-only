@@ -368,8 +368,6 @@
     if ((s.가림캔버스.style.visibility === 'hidden') !== 아래막) s.가림캔버스.style.visibility = 아래막 ? 'hidden' : '';
     잼('3D:아래막');
     try { 색필터(R, s); } catch (e색) {}
-    /* 정본 456 3단계 — 유닛 그림 판 GPU 그리기(스위치 window.__유닛GPU그림 · 기본 꺼짐 · 못 그리는 장은 옛 길) */
-    try { if (root.G2유닛GPU층 && root.G2유닛GPU층.그리기 && (root.__유닛GPU그림 || R.spriteLayer._유닛GPU감춤)) root.G2유닛GPU층.그리기(R); } catch (e유GPU) {}
     잼('3D:색필터');
   }
 
@@ -427,16 +425,7 @@
 
   /* 유닛 상자를 지형 높이만큼 띄워 지면에 수직으로 세운다 — 실행기 _빌보드적용 이 매 장면 변환을 다시 쓰므로 그 뒤에 덮는다 */
   function 유닛띄우기(R, s) {
-    /* 정본 456 2단계 — 스위치(window.__유닛GPU재기)가 켜지면 사각을 계산식(유닛GPU층.js)으로 host 안 좌표에 바로 — 반영마다 일던 강제 배치 계산을 안 한다
-     *   못 푼 요소만 옛 길로 재고 host 를 빼서 같은 좌표로 맞춘다 · 꺼져 있으면 예전과 똑같다 */
-    var GP = root.G2유닛GPU층, 새재기 = !!(GP && GP.쓸까 && GP.쓸까(R)), 호진짜 = null;
-    if (GP && GP.묶음끝) GP.묶음끝();   /* 앞에서 예외로 못 닫은 묶음이 있으면 버린다(아래 쓰기 전에) */
-    var 재 = 새재기 ? function (e) {
-      var q = GP.사각(e, R); if (q) return q;
-      var g = e.getBoundingClientRect(), h = 호진짜 || (호진짜 = R.host.getBoundingClientRect());
-      return { left: g.left - h.left, top: g.top - h.top, right: g.right - h.left, bottom: g.bottom - h.top, width: g.width, height: g.height };
-    } : null;
-    var 사각 = [], 호 = 새재기 ? { left: 0, top: 0 } : R.host.getBoundingClientRect(), H = (s.장면.지정() || {}).H || 200;
+    var 사각 = [], 호 = R.host.getBoundingClientRect(), H = (s.장면.지정() || {}).H || 200;
     var 상자들 = R.unitEls || {};
     s.유닛표 = null;
     /* ★ 정본 400 — 쓰기(세우기)를 먼저 다 하고 읽기(그림사각 = getBoundingClientRect)를 모아서 한다
@@ -453,19 +442,16 @@
       if (값 && 값.style.display !== 'none') { 세우기(R, s, 값, 닻0); 값._3d유닛값 = true; }
       세운.push({ box: box0, u: u0, 닻: 닻0 });
     }
-    if (새재기) GP.묶음시작();   /* 정본 456 2단계 — 아래 고리는 읽기만 한다(쓰기는 위 고리) · 요소별 행렬을 담아 다시 씀 */
-    try {   /* 정본 456 5단계 전 — 고리에서 예외가 나도 묶음은 닫는다(열린 채면 그 반영 안 다른 재기가 낡은 행렬을 쓴다) */
     for (var si = 0; si < 세운.length; si++) {
       var box = 세운[si].box, u = 세운[si].u, 닻 = 세운[si].닻;
-      var r = 그림사각(box, false, 재);
+      var r = 그림사각(box, false);
       /* ★ 정본 482 — 구조물(문·감옥벽)은 윗단을 clip-path 로 잘라 낸다(구조세우기) — 잘린 줄은 화면에 없는데 상자(getBoundingClientRect)는 clip 을 모른다
        *   ☠ 9-6 PRISON01: 남쪽 감옥문(10,32) 상자가 잘린 윗단만큼(화면 80px) 위로 커져 북쪽 감옥문(10,24)·그 앞 병사 자리와 겹쳤다 — 겹친 자리는 가까운 판(남쪽 문)이 이겨
        *     그 사이 남쪽 벽(28~32줄 · 높이 150)이 북쪽 문 아랫단·병사를 못 덮었다 (사장님 11-26 「벽 위쪽으로 캐릭터가 비쳐보이고 북쪽 감옥문이 남쪽 벽을 가려」)
        *   ⇒ 잘린 선(상자 안 세로 자름px)에 높이 0 표지(구조세우기 가 둔다)를 두고 그 화면 자리로 윗변을 내린다 — 비례로 내리면 원근 탓에 1~2px 틈이 남았다 */
-      if (box._3d자름 > 0.5 && box._3d자름표 && box._3d자름표.parentNode === box) { var 자선 = box._3d자름표.getBoundingClientRect(), 윗 = Math.ceil(자선.top - 호.top) + 1 + 호.top;   /* 옛 길 r 은 뷰포트 좌표 · 새 길(재)은 host 안 좌표
+      if (box._3d자름 > 0.5 && box._3d자름표 && box._3d자름표.parentNode === box) { var 자선 = box._3d자름표.getBoundingClientRect(), 윗 = Math.ceil(자선.top - 호.top) + 1 + 호.top;   /* r 은 뷰포트 좌표
          *   올림 — 지정본그리기 지형가림 가위가 윗변을 내림(floor)하므로 잘린 선이 픽셀 중간이면 그 한 줄을 이 판이 차지해 아래 판 그림이 1px 줄로 비쳤다 ·
          *   +1 — 잘린 선 바로 아래 줄은 clip 가장자리 섞임으로 반쯤 비친다(9-6 실측 253줄 · 뒤 문 색이 섞임) */
-        if (재) { 호진짜 = 호진짜 || R.host.getBoundingClientRect(); 윗 = Math.ceil(자선.top - 호진짜.top) + 1; }
         if (윗 > r.top && 윗 < r.bottom) r = { left: r.left, top: 윗, right: r.right, bottom: r.bottom, width: r.width, height: r.bottom - 윗 }; }
       if (r.width < 1 || r.height < 1) continue;
       var 줄 = Number.isFinite(box._row) ? box._row : (u.y | 0);
@@ -495,13 +481,12 @@
        *   ⇒ 같은 높이 앞 땅은 그림자를 안 덮고, 앞에 솟은 벽·턱만 덮는다(눕힌 판 = 지정본그리기_가림판 발.눕 · 높이 = 선 땅 + 1) */
       var 그 = box._shd;
       if (그 && 그.style.display !== 'none') {
-        var rs = 재 ? 재(그) : 그.getBoundingClientRect();
+        var rs = 그.getBoundingClientRect();
         if (rs.width >= 1 && rs.height >= 1)
           사각.push({ l: rs.left - 호.left, t: rs.top - 호.top, r: rs.right - 호.left, b: rs.bottom - 호.top, 줄: 줄, 그림자: true,
                       발: { x: 닻.x, y: 닻.가림F != null ? 닻.가림F : 닻.F, h: 닻.높, 눕: true } });
       }
     }
-    } finally { if (새재기) GP.묶음끝(); }
     return 사각;
   }
 
@@ -875,7 +860,7 @@
     for (var i = 0; i < L.length; i++) { var e = L[i] && L[i].el; if (e && e.style.display !== 'none' && 목.indexOf(e) < 0) 목.push(e); }
     return 목;
   }
-  function 그림사각(box, 몸만, 재) {   /* 재 — 정본 456 2단계: 주면 그것으로 잰다(host 안 좌표 · 유닛띄우기) · 없으면 예전대로 getBoundingClientRect(뷰포트) */
+  function 그림사각(box, 몸만) {
     /* 발밑 지형 효과(눈·물 · 배경 그림 div)와 그림자 div 도 — canvas·img 만 모으면 몸 아래로 내려온 효과 띠가 가림판 자리에서 빠져
      *   둑 뒤 유닛의 발밑 눈 띠만 둑 앞으로 삐져나왔다 (10-20 LFT01 · 몸 바닥 737 · 효과 바닥 748) */
     /* (10-24) 턴 마커(.g2-ready)·상태 그림(.g2-ail·.g2-ailfx)도 — 배경 그림 div 라 빠져, 건물 뒤에서 마커만 지붕 위로 비쳤다 (사장님 「턴 돌아왔다는 ai 마커를 포함해서 … 힐끗힐끗 비쳐보여」) */
@@ -883,11 +868,11 @@
     var 안 = 몸층들(box, 'canvas, img, .g2-지형효과, .g2-shadow, .g2-ready, .g2-ail, .g2-ailfx, .g2-charfx'), l = Infinity, t = Infinity, rr = -Infinity, bb = -Infinity;
     for (var i = 0; i < 안.length; i++) {
       if (몸만 && (안[i].closest('.g2-shadow') || 안[i].closest('.g2-지형효과'))) continue;
-      var q = 재 ? 재(안[i]) : 안[i].getBoundingClientRect();
+      var q = 안[i].getBoundingClientRect();
       if (q.width < 1 || q.height < 1) continue;
       if (q.left < l) l = q.left; if (q.top < t) t = q.top; if (q.right > rr) rr = q.right; if (q.bottom > bb) bb = q.bottom;
     }
-    if (!(rr > l && bb > t)) return 재 ? 재(box) : box.getBoundingClientRect();
+    if (!(rr > l && bb > t)) return box.getBoundingClientRect();
     return { left: l, top: t, right: rr, bottom: bb, width: rr - l, height: bb - t };
   }
   /* 높이 h 만큼 세계 z 로 띄운다.
@@ -1708,18 +1693,7 @@
     표.원점유닛 = R.화면점유닛;
     if (표.원점유닛) R.화면점유닛 = function (units, x, y) {
       if (!(표.준비됨 && R.host.classList.contains('g2-3d맵'))) return 표.원점유닛.call(this, units, x, y);
-      /* 정본 456 2단계 — 스위치가 켜지면 elementsFromPoint 대신 계산식 후보(쌓임 차례 → DOM 차례 · 상자나 보이는 자식이 점을 품음) · 못 풀면 옛 길 */
-      var GP = root.G2유닛GPU층;
-      if (GP && GP.쓸까 && GP.쓸까(R)) {
-        var 호0 = R.host.getBoundingClientRect(), 앞들 = GP.점유닛후보(units, x - 호0.left, y - 호0.top, R);
-        if (앞들) { for (var a = 0; a < 앞들.length; a++) if (R.유닛불투명픽셀인가(앞들[a], x, y)) return 앞들[a]; return null; }
-      }
-      /* 정본 456 5단계 — GPU 가 그려 판(spriteLayer)을 visibility:hidden 으로 숨긴 장이면 elementsFromPoint 가 유닛을 못 본다 → 이 옛 길에서만 잠깐 보이게 하고 잰 뒤 다시 숨긴다
-       *   (계산식이 못 푸는 질의 — 다른 층 유닛·clip/mask·pointer-events none — 에서만 온다 · 같은 동기 구간이라 화면에는 안 나온다 · 끄기 __유닛GPU점옛길숨김) */
-      var 판0 = R.spriteLayer, 잠깐 = !!(판0 && 판0._유닛GPU감춤 && 판0.style.visibility === 'hidden' && !root.__유닛GPU점옛길숨김);
-      if (잠깐) 판0.style.visibility = '';
-      var 목; try { 목 = root.document.elementsFromPoint(x, y); } finally { if (잠깐) 판0.style.visibility = 'hidden'; }
-      var 상자 = new Map(), 본 = [];
+      var 목 = root.document.elementsFromPoint(x, y), 상자 = new Map(), 본 = [];
       for (var i = 0; i < (units || []).length; i++) { var u = units[i], b = u && u.alive && R.unitEls && R.unitEls[u.id]; if (b) 상자.set(b, u); }
       for (var j = 0; j < 목.length; j++) {
         var n = 목[j]; while (n && !상자.has(n)) n = n.parentNode;

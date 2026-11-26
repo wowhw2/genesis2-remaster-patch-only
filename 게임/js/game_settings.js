@@ -208,7 +208,10 @@ function 쪽짓기(스케일러목록) {
       { 종류: '고르기', 이름: '실내 벽 내리기', 키: '벽내리기', 값들: ['끔', '화면', '전체'], 보이기: ['벽내리기 끄기', '하단 벽 내리기', '전체 벽 내리기'] },
       /* 정본 400 — 성능 그래프(프레임 시간·구간별 시간을 화면 왼쪽 위에) · PC F9 */
       { 종류: '고르기', 이름: '성능 그래프', 키: '성능그래프', 값들: ['끔', '켬'],
-        설명: '화면 왼쪽 위에 프레임 시간과 구간별 처리 시간을 그래프로 띄웁니다(개발·점검용). PC 는 F9 로도 켜고 끕니다.' } ] },
+        설명: '화면 왼쪽 위에 프레임 시간과 구간별 처리 시간을 그래프로 띄웁니다(개발·점검용). PC 는 F9 로도 켜고 끕니다.' } ].concat(
+      /* 정본 487 — PC 만(휴대폰 앱은 이미 화면을 꽉 쓴다 · 터치.js 가 G2터치 를 단다) · 사장님 11-26 「그냥 전체화면 모드를 만들어. 화면에서 전체화면으로 보기」 */
+      !root.G2터치 ? [{ 종류: '고르기', 이름: '전체화면으로 보기', 키: '전체화면', 값들: ['끔', '켬'],
+        설명: '모니터 전체를 게임 화면으로 씁니다. 끄면 창으로 돌아옵니다. PC 는 F11 로도 켜고 끕니다. 켜 두면 다음에 켤 때도 전체화면입니다.' }] : []) },
     { 이름: '리마스터 규칙', 항목: [
       { 종류: '일괄', 이름: '일괄 적용', 값들: ['모두 리마스터', '모두 원작'] }
     ].concat(규칙.map(function (r) { return { 종류: '켜기', 이름: r.이름, 짧은이름: r.짧은이름, 키: r.키, 켬: r.켬, 끔: r.끔, 설명: r.설명 }; })).concat([
@@ -813,6 +816,7 @@ function 게임값() {
     if (p.설정.조작방식) v.조작방식 = p.설정.조작방식;
   }
   try { if (root.G2성능) v.성능그래프 = root.G2성능.켜짐() ? '켬' : '끔'; } catch (e) { }   /* 정본 400 */
+  v.전체화면 = 전체화면.켜짐() ? '켬' : '끔';   /* 정본 487 */
   if (root.G2터치 && root.G2터치.가상패드) { try { v['터치.가상패드'] = root.G2터치.가상패드() ? '켬' : '끔'; v['터치.단추'] = root.G2터치.단추보이기() ? '보이기' : '숨기기'; } catch (e) { } }   /* 정본 381 */
   try { var 벽 = (root.G2마을3D && root.G2마을3D.벽내리기) ? root.G2마을3D.벽내리기() : (root.localStorage && root.localStorage.getItem(벽내리기키)); if (벽 === '칸') 벽 = '끔'; if (벽 === '끔' || 벽 === '화면' || 벽 === '전체') v.벽내리기 = 벽; } catch (e) { }
   return v;
@@ -829,6 +833,7 @@ function 게임적용(k, v) {
     return;
   }
   if (k === '성능그래프') { try { if (root.G2성능) root.G2성능.켜기(v === '켬'); } catch (e) { } return; }   /* 정본 400 */
+  if (k === '전체화면') { 전체화면.켜기(v === '켬'); return; }   /* 정본 487 */
   if (k === '터치.가상패드') { try { root.G2터치.가상패드(v === '켬'); } catch (e) { } return; }   /* 정본 381 — 이 기기에만 기억(터치.js) */
   if (k === '터치.단추') { try { root.G2터치.단추보이기(v === '보이기'); } catch (e) { } return; }
   if (k === '조작방식' || k.indexOf('패드.') === 0) {
@@ -950,9 +955,50 @@ function 자원받기(바이트) {
   return _자원;
 }
 
+/* ══ 정본 487 — 전체화면으로 보기 (사장님 11-26 「그냥 전체화면 모드를 만들어. 화면에서 전체화면으로 보기」) ══
+ *   웹 전체화면(document.documentElement.requestFullscreen) — PC 앱(일렉트론)은 창이 모니터 전체로 · 브라우저도 같다
+ *   ☠ PC 앱은 기본 메뉴를 빼 F11 단축키가 없었다(앱/main.js Menu.setApplicationMenu(null)) — 게임이 F11 을 받아 켜고 끈다
+ *   기억(g2.전체화면) — 켜 둔 채 끄면 다음에 켤 때 다시 전체화면 · 브라우저가 «누른 뒤에만» 허락하면 다음 키·클릭 때 켠다
+ *   화면비 틀(4:3·16:9 레터박스)은 게임.html 이 전체화면에서도 그대로 맞춘다(document.fullscreenElement) · 휴대폰(G2터치)은 손대지 않는다 */
+var 전체화면 = (function () {
+  var 열쇠 = 'g2.전체화면', d = root.document;
+  function 켜짐() { return !!(d && (d.fullscreenElement || d.webkitFullscreenElement)); }
+  function 기억(v) { try { if (v) root.localStorage.setItem(열쇠, '켬'); else root.localStorage.removeItem(열쇠); } catch (e) { } }
+  function 기억값() { try { return root.localStorage.getItem(열쇠) === '켬'; } catch (e) { return false; } }
+  var 기다림 = false;
+  function 누르면켜기() {   /* 브라우저가 사용자 동작 없이 막으면 — 다음 키·클릭에 한 번 더 */
+    if (기다림 || !d) return; 기다림 = true;
+    var 한번 = function (e) {
+      if (e && e.key === 'F11') return;   /* F11 은 아래 키 처리가 맡는다 */
+      기다림 = false; d.removeEventListener('keydown', 한번, true); d.removeEventListener('pointerdown', 한번, true);
+      if (기억값()) 켜기(true, true);
+    };
+    d.addEventListener('keydown', 한번, true); d.addEventListener('pointerdown', 한번, true);
+  }
+  function 켜기(v, 기억안함) {
+    if (!d || !d.documentElement) return;
+    if (!기억안함) 기억(!!v);
+    try {
+      if (v && !켜짐()) {
+        var el = d.documentElement, f = el.requestFullscreen || el.webkitRequestFullscreen;
+        if (f) { var p = f.call(el); if (p && p['catch']) p['catch'](function () { 누르면켜기(); }); }
+      } else if (!v && 켜짐()) {
+        var x = d.exitFullscreen || d.webkitExitFullscreen;
+        if (x) { var q = x.call(d); if (q && q['catch']) q['catch'](function () { }); }
+      }
+    } catch (e) { 누르면켜기(); }
+  }
+  var 폰 = false; try { 폰 = /[?&]모바일=1/.test(decodeURIComponent((root.location && root.location.search) || '')); } catch (e) { }   /* 터치.js(G2터치)는 이 파일 뒤에 실린다 */
+  if (d && d.addEventListener && !root.G2터치 && !폰) {
+    d.addEventListener('keydown', function (e) { if (e.key === 'F11' && !e.repeat) { e.preventDefault(); e.stopPropagation(); 켜기(!켜짐()); } }, true);
+    if (기억값()) 켜기(true, true);
+  }
+  return { 켜짐: 켜짐, 켜기: 켜기 };
+})();
+
 var API = { 창: 창, 틀계산: 틀계산, 쪽짓기: 쪽짓기, 기본값: 기본값, 규칙: 규칙, 규칙설명: 규칙설명, 줄나누기: 줄나누기, 설명폭: 설명폭, 설명줄수: 설명줄수, 글폭: 글폭, 틀: 틀, 실제이름: 실제이름,
             배속표: 배속표, 경험치배율표: 경험치배율표, 적능력배율표: 적능력배율표,
-            게임값: 게임값, 게임적용: 게임적용, 돌무늬짓기: 돌무늬짓기, 자원받기: 자원받기, 돌무늬받기: 돌무늬받기, 돌무늬나눠짓기: 돌무늬나눠짓기 };
+            게임값: 게임값, 게임적용: 게임적용, 전체화면: 전체화면, 돌무늬짓기: 돌무늬짓기, 자원받기: 자원받기, 돌무늬받기: 돌무늬받기, 돌무늬나눠짓기: 돌무늬나눠짓기 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 root.G2GameSettings = API;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
