@@ -2800,6 +2800,8 @@
        /* 일반 필살기 0x454D5는 이미 그린 배경만 치환한다. 새 NSP 장은
         * 치환 전 DAC로 그리므로 화면 리맵 팔레트로 굽지 않는다. */
        var framePal = R._dacPal || R.팔레트();
+      /* 나중에 구울 때도 «싣던 순간» 팔레트로 — 그사이 팔레트 배열이 제자리에서 바뀌어도(화면 리맵 등) 같은 색 (정본 456 나중에 굽기) */
+      var 싣던팔 = (framePal && framePal.slice) ? framePal.slice() : framePal;
       /* ☠ **BARRIER.NSP 의 색 0 을 투명으로 해 봤다가 되돌렸다** (2026-09-10)
        *   그림의 65 %(타원 안쪽)를 투명으로 하니 검은 덩어리는 사라졌지만
        *   **원본에 있는 검은 마법진까지 함께 사라졌다.** 청록 그물도 안 생겼다.
@@ -2809,7 +2811,16 @@
         /* ★ `_fr`(원본 인덱스 프레임)을 남긴다 — **`.RPL` 팔레트 애니메이션**이
          *   팔레트를 갈아 다시 구워야 하기 때문이다(`magicfx.js rplUrl`).
          *   버리면 `idx` 가 없어 색을 못 바꾼다. (2026-08-25) */
-        return { canvas: G2Native.frameToCanvas(fr, framePal), ax: fr.ax, ay: fr.ay, _fr: fr, _팔레트: framePal };
+        /* ★ 정본 456 (사장님 11-26 «무거운 계산부터 줄임») — 캔버스는 «처음 꺼낼 때» 만든다(같은 팔레트·같은 결과)
+         *   ☠ 모든 장을 싣는 자리에서 한꺼번에 스케일러(xBRZ)까지 돌려, 초필살기 첫 장이 휴대폰 흉내 140ms 였다(프로파일: frameToCanvas→스케일러 15%)
+         *   끄기 window.__초필그림한꺼번에 */
+        var 장 = { ax: fr.ax, ay: fr.ay, _fr: fr, _팔레트: framePal };
+        if (window.__초필그림한꺼번에) { 장.canvas = G2Native.frameToCanvas(fr, framePal); return 장; }
+        var cv = null;
+        Object.defineProperty(장, 'canvas', { configurable: true, enumerable: true,
+          get: function () { if (!cv) cv = G2Native.frameToCanvas(fr, 싣던팔); return cv; },
+          set: function (v) { cv = v; } });
+        return 장;
       });
       return ultNsp[file];
     }).catch(function (e) { console.warn('초필살 그래픽 로드 실패:', file, e && e.message); return null; }));

@@ -162,7 +162,10 @@ function Renderer(host, G2, battle, 시간원찾기) {
    *   앞에 꽂아 DOM 순서로 눌렀지만, 그러면 이 평면(z=0)이 세운 그림자의 아랫부분
    *   (z<0)을 **덮는다.** 지면과 성질이 같으니 자리도 지면과 같아야 한다. */
   this.markLayer = el('div', '', this.groundLayer);
-  this.markLayer.style.cssText = 'position:absolute;transform-style:preserve-3d;';
+  /* 정본 477 — 움직이는 바닥(물결 움직임 판 · 움직이는 눕힘 조각)이 z 다툼을 피하려 translateZ(0.05px) 로 떠 있어(아래 tileLayer·_애니판)
+   *   z=0 인 표식이 그 밑에 깔려 바다 칸에서 이동 범위가 안 보였다 (신고 버그신고_20261126_110059 「해상전에 이동범위 표기가 안되요」 · 19-1 WAT03 물결 3600칸)
+   *   원본 0x1547F 는 바닥을 다 그린 뒤 그 칸을 리맵한다 → 표식은 움직이는 바닥보다 위 · 무덤 가시처럼 덮인 칸은 위 표식(덮개 층 addMarkTop)이 따로 맡는다 */
+  this.markLayer.style.cssText = 'position:absolute;transform-style:preserve-3d;transform:translateZ(0.06px);';
 
   /* ★★★ **유닛보다 아래에 깔리는 이펙트** — 바닥 불·마법진·별표 (2026-08-16)
    *
@@ -8481,8 +8484,13 @@ Renderer.prototype._보간값 = function (prev, cur) {
 Renderer.prototype._그림자캐시키 = function (no) {
   var N = (root.G2Scaler && root.G2Scaler.N) ? root.G2Scaler.N() : 1;
   var pal = this._유닛팔레트 ? this._유닛팔레트() : null;
+  /* ★ 정본 456 (사장님 11-26 «무거운 계산부터 줄임») — 같은 반영의 updateUnit 고리 안(_빌장번)에서는 팔레트가 안 바뀌므로 해시를 한 번만 센다
+   *   ☠ 유닛마다 팔레트 768칸을 반영마다 해시했다(휴대폰 흉내 18-1 유닛 78 스크롤 프로파일 4%) · 고리 밖은 예전처럼 매번 · 끄기 window.__팔해시매번 */
+  var 담 = this._팔해시담;
+  if (pal && this._빌장번 && !root.__팔해시매번 && 담 && 담.번 === this._빌장번 && 담.pal === pal) return (no | 0) + '|' + N + '|' + 담.h;
   var h = 0x811c9dc5;
   if (pal) for (var i = 0; i < pal.length; i++) { h ^= pal[i]; h = (h * 0x01000193) >>> 0; }
+  if (pal && this._빌장번) this._팔해시담 = { 번: this._빌장번, pal: pal, h: h.toString(16) };
   return (no | 0) + '|' + N + '|' + (pal ? h.toString(16) : '-');
 };
 /** 그림자 프레임 번호에 대응하는 원본 직독 URL을 반환한다. */
@@ -13305,7 +13313,15 @@ Renderer.prototype._유닛돔차례 = function () {
   무리.forEach(function (bs, p) {
     if (bs.length < 2) return;
     var 지금 = Array.prototype.filter.call(p.children, function (c) { return bs.indexOf(c) >= 0; });
-    var 차 = 지금.slice().sort(function (a, c) { return (a._칸[1] - c._칸[1]) || (a._칸[0] - c._칸[0]); });
+    /* ★ 정본 456 (사장님 11-26 «무거운 계산부터 줄임») — 기준을 _스프라이트대열정렬 과 똑같이(줄 _row → 종류 → 칸 y → x)
+     *   ☠ 칸 y·x 만 보면 연출 맨 위 유닛(_연출최후그림)·절벽 위 유닛(목록 D)·공격 중 유닛처럼 줄 값이 다른 유닛에서 대열정렬과 서로 뒤집어
+     *     apply 마다 유닛 상자를 전부 떼었다 붙였다(11-26 크롬 추적 2-4A 메테오: 이 자리에서 상자 끼움 2초 5,560번 · 끼울 때마다 스타일·배치 처음부터) · 끄기 window.__돔차례칸만 */
+    var 칸만 = !!(typeof root !== 'undefined' && root && root.__돔차례칸만);
+    function 종(e) { return (e._정렬종류 != null) ? e._정렬종류 : ((typeof e._kind === 'number') ? e._kind : 0); }
+    var 차 = 지금.slice().sort(function (a, c) {
+      if (!칸만) { var ar = a._row == null ? 0 : a._row, cr = c._row == null ? 0 : c._row; if (ar !== cr) return ar - cr; var ak = 종(a), ck = 종(c); if (ak !== ck) return ak - ck; }
+      return (a._칸[1] - c._칸[1]) || (a._칸[0] - c._칸[0]);
+    });
     var 같다 = true; for (var i = 0; i < 차.length; i++) if (차[i] !== 지금[i]) { 같다 = false; break; }
     if (같다) return;
     var 표 = 지금.map(function (b) { var m = document.createComment('u'); p.insertBefore(m, b); return m; });
@@ -13513,8 +13529,14 @@ Renderer.prototype._apply본 = function () {
    * 바닥과 오브젝트는 눕힌 채 두므로 여기서 건드리지 않습니다. */
   var self = this;
   _잼('반영:카메라');
+  /* ★ 정본 456 (사장님 11-26 «무거운 계산부터 줄임») — updateUnit 이 이번 반영에서 이미 빌보드를 세운 상자(유닛최종배치 → _빌보드놓기 → _빌보드적용)는
+   *   바로 아래 고리에서 다시 세우지 않는다 — 그 사이 바뀌는 것이 없어 같은 일을 두 번 했다(3D 면 감싼 세우기까지 두 번 · 11-26 2-4A 스크롤 프로파일 빌보드 14%)
+   *   updateUnit 이 일찍 돌아간 상자(그림 아직)·목록 밖 상자는 그대로 세운다 · 끄기 window.__빌보드두번 */
+  var 빌번 = this._빌장번 = (this._빌번 = (this._빌번 | 0) + 1);
   this.b.units.forEach(function (u) { self.updateUnit(u); });
-  Object.keys(this.unitEls).forEach(function (k) { self._빌보드적용(self.unitEls[k]); });
+  this._빌장번 = 0;
+  var 두번 = !!root.__빌보드두번;
+  Object.keys(this.unitEls).forEach(function (k) { var e = self.unitEls[k]; if (!두번 && e && e._빌보드한번 === 빌번) return; self._빌보드적용(e); });
   _잼('반영:유닛');
   /* 정본 400 — 3D 가 켜져 있는 동안(호스트 g2-3d맵 · 기울기·회전 있음) 맵 사물 판은 CSS 로 감춰진다(리마스터3D 규칙넣기 · 3D 장면이 대신 그림) — 그 판을 반영마다 세워 놓지 않는다
    *   (측정 크롬 1-7 기울기 45 · 필살기: 반영 한 번에 사물 178개 전부 감춰진 채 세워 놓기 · 휴대폰 흉내 ×6 반영:유닛+사물 구간의 큰 몫)
@@ -13758,6 +13780,7 @@ Renderer.prototype._원경시차반영 = function () {
 /** 세운 요소 하나의 최종 위치·회전. apply() 와 selectBox() 가 함께 씁니다. */
 Renderer.prototype._빌보드적용 = function (e) {
   if (!e || e._ground == null) return;
+  if (this._빌장번) e._빌보드한번 = this._빌장번;   /* 이번 반영의 updateUnit 고리 안에서 세움 — 아래 apply 고리가 건너뛴다(정본 456) */
   /* 표시 보간 — 논리 위치(_left/_ground)는 그대로, 화면 좌표만 섞습니다 */
   var gy = this._보간값(e._pg, e._ground);
   /* ★ 같은 값이면 안 쓴다 — 기울기 평면 대열에서는 style 쓰기마다 관찰기가 돌아 합친 변환을 다시 확인한다 (2026-10-08 성능) */

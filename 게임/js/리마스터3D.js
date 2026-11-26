@@ -669,12 +669,44 @@
     }
     return s.장면.높이(cx / 24, cy) || 0;
   }
+  /* 몸 배치 변화 관찰 — 유닛 상자 «안쪽» 요소(속성·자식)가 바뀌면 그 상자의 _몸판 을 올린다 · 상자 자기 속성(카메라마다 바뀌는 변환)은 안 센다
+   *   ☠ 빈 콜백이면 마이크로태스크마다 기록이 콜백으로 넘어가 버려진다 — 콜백에서도 찍는다(정본 456 관찰 함정) */
+  var 몸관 = null, 몸관판 = null, 몸관세대 = 0;
+  function 몸찍기(기록) {
+    for (var i = 0; i < 기록.length; i++) {
+      var q = 기록[i], t = q.target;
+      if (q.type === 'attributes' && t._unit && t.classList && t.classList.contains('g2-unit')) continue;
+      var b = t.closest ? t.closest('.g2-unit') : null;
+      if (b) b._몸판 = (b._몸판 | 0) + 1;
+    }
+  }
+  function 몸변화받기(R) {
+    var L = R && R.spriteLayer;
+    if (!L || !root.MutationObserver) return false;
+    if (몸관판 !== L) { if (몸관) 몸관.disconnect(); 몸관 = new root.MutationObserver(몸찍기); 몸관.observe(L, { attributes: true, childList: true, subtree: true }); 몸관판 = L; 몸관세대++; }
+    몸찍기(몸관.takeRecords());
+    return true;
+  }
   /* 유닛 몸 그림의 상자 안 배치 사각형 — 그림자·지형효과 빼고 · offsetLeft/Top 이라 변환에 안 흔들린다 */
   function 몸배치(b) {
     var 안 = 몸층들(b, 'canvas, img'), l = 1e9, t = 1e9, r = -1e9, bb = -1e9;
     /* 정본 400 — 몸 그림의 상자 안 배치는 그림 요소들의 속성(인라인 스타일·클래스·그림 크기)과 상자 크기가 같으면 같다 — 그때는 offset 을 다시 읽지 않는다
      *   (offsetWidth 읽기가 반영마다 앞서 쓴 transform 때문에 배치를 통째로 다시 셈했다 · 측정 크롬 휴대폰 흉내 아군 AI 8초 중 989ms · 필살기 196ms) · 끄기 window.__몸배치매번 */
     var 열 = (b.style.width || '') + '/' + (b.style.height || '') + '/' + 안.length;
+    /* ★ 정본 456 (사장님 11-26 «무거운 계산부터 줄임») — 판 안 상자면 «안쪽이 바뀐 번호»(변화 관찰 · 몸변화받기)로 열쇠를 만든다
+     *   ☠ 요소마다 cssText 를 글자로 엮는 열쇠가 유닛 78 명에서 무거웠다(휴대폰 흉내 18-1 차례 넘김 프로파일 몸배치 13.6%) · 상자 자기 변환은 몸 배치와 무관해 안 센다
+     *   관찰 밖 상자(유닛 위층 등)·관찰 못 하는 곳은 예전 열쇠 · 끄기 window.__몸배치관찰끔 */
+    if (!root.__몸배치관찰끔 && 몸변화받기(root.R) && 몸관판 && 몸관판.contains(b)) {
+      열 = '판' + 몸관세대 + ':' + (b._몸판 | 0) + '/' + 열;
+      for (var zi = 0; zi < 안.length; zi++) if (안[zi].tagName === 'IMG') 열 += '|' + (안[zi].naturalWidth | 0) + 'x' + (안[zi].naturalHeight | 0);
+      if (b._몸배치 && b._몸배치.열 === 열 && !root.__몸배치매번) {
+        if (root.__몸배치검사) { var 참 = 몸배치셈(b, 안, l, t, r, bb), 담값 = b._몸배치.값; root.__몸배치검사수 = (root.__몸배치검사수 | 0) + 1; if (참.l !== 담값.l || 참.t !== 담값.t || 참.w !== 담값.w || 참.h !== 담값.h) root.__몸배치틀림 = (root.__몸배치틀림 | 0) + 1; }   /* 검사 전용 — 담아 둔 값이 새로 센 값과 같은가 */
+        return b._몸배치.값;
+      }
+      var 값0 = 몸배치셈(b, 안, l, t, r, bb);
+      b._몸배치 = { 열: 열, 값: 값0 };
+      return 값0;
+    }
     for (var z = 0; z < 안.length; z++) {
       var 요 = 안[z]; 열 += '|' + 요.className + ':' + 요.style.cssText + ':' +
         (요.tagName === 'IMG' ? (요.naturalWidth | 0) + 'x' + (요.naturalHeight | 0) + ':' + 요.getAttribute('width') + 'x' + 요.getAttribute('height') + ':' + 요.src   /* img.width 는 그려진 폭이라 배치를 다시 셈한다 */
@@ -1184,7 +1216,7 @@
   }
   function 즉시띄우기(R, s, e) {
     현재돌 = (R.cam && R.cam.rot) || 0; 현재기울 = (R.cam && R.cam.tilt) || 0;
-    if (e._unit && R.unitEls && R.unitEls[e._unit.id] === e) { 세우기(R, s, e, 유닛닻(R, s, e)); if (!s.apply중) 가림다시(R, s); return; }
+    if (e._unit && R.unitEls && R.unitEls[e._unit.id] === e) { if (s.apply중 && s.갱신예정) return; 세우기(R, s, e, 유닛닻(R, s, e)); if (!s.apply중) 가림다시(R, s); return; }   /* 갱신예정 — 이번 반영 끝 유닛띄우기가 세운다(정본 456) */
     if (e === R._probeEl) {                              /* screenOfRendered 의 재는 점 — 재는 유닛을 닻으로 (HUD 캔버스 숫자가 3D 자리를 따른다) */
       var 잼 = s.재는유닛 && R.unitEls && R.unitEls[s.재는유닛.id];
       if (잼) 세우기(R, s, e, 잼._3d닻 || 유닛닻(R, s, 잼));
@@ -1846,10 +1878,13 @@
         if (root.requestAnimationFrame) root.requestAnimationFrame(한번);
         setTimeout(한번, 34);
       }
+      /* 정본 456 (사장님 11-26 «무거운 계산부터 줄임») — 이번 반영 끝에 갱신(유닛띄우기)이 «반드시» 돌면, 반영 도중 updateUnit 안의 유닛 즉시 세우기는 건너뛴다(아래 즉시띄우기)
+       *   유닛띄우기가 같은 닻(유닛닻)으로 다시 세우고 체력 숫자도 함께 세운다 — 반영 한 번에 유닛을 두 번 세웠다(11-26 휴대폰 흉내 18-1 유닛 78 스크롤: 한 장 39ms) */
+      표.갱신예정 = !!(켬 && !모음 && !root.__유닛즉시세움);
       try { r = 표.원apply.apply(this, arguments); if (!모음) { 표.그린때 = 지금; 표.그린캠 = 캠키; try { 갱신(this); } catch (e) { console.warn('[리마스터3D] 그리기 오류', e); }
         if (켬 && !표.이번틀그림) { 표.이번틀그림 = true; var 풀기 = function () { 표.이번틀그림 = false; }; if (root.requestAnimationFrame) root.requestAnimationFrame(풀기); setTimeout(풀기, 34); } } }
       finally {
-        표.apply중 = false; 표.옮 = null;
+        표.apply중 = false; 표.옮 = null; 표.갱신예정 = false;
         if (옮) {
           c.cx -= 옮.x; c.cy -= 옮.y; if (this._pcam) { this._pcam.cx -= 옮.x; this._pcam.cy -= 옮.y; }
           /* ★ 화면 카메라(_vcam)도 높이 밀림을 뺀 값으로 돌려 둔다 — 퇴각 걸음(leaveWalk 카메라 칸)·지속 피해 화면 안 판정 등 «판단»이
