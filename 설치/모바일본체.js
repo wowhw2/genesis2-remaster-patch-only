@@ -546,6 +546,33 @@ http.createServer(async (req, res) => {
       f.on('error', e => 제이슨(res, { 오류: String(e.message) }, 500));
       return;
     }
+    /* 정본 480 — 세이브 내보내기: 게임 화면(js/save_transfer.js)이 묶은 세이브 꾸러미(JSON)를 «사용자가 볼 수 있는 폴더»에 쓴다
+     *   휴대폰 웹뷰는 파일 내려받기가 안 돼서(버그 신고도 «휴대폰은 파일을 남길 수 없다») 본체가 대신 쓴다
+     *   자리 = 원본 CD 파일을 넣던 바깥 폴더(바깥폴더후보[0] — 안드로이드 Android/data/kr.genesis2.remaster/files/원본 · 아이폰 문서/원본)의 옆 «세이브내보내기»
+     *   ☠ 게임 화면과 창구가 달라(포트) 몸은 text/plain(사전 요청 없음) · 답에 Access-Control-Allow-Origin */
+    if (p === '/saveexport') {
+      const 답 = (o, code) => { res.writeHead(code || 200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' }); res.end(JSON.stringify(o)); };
+      if (req.method === 'OPTIONS') return 답({ ok: true });
+      if (req.method !== 'POST') return 답({ ok: false, 말: 'POST 만' }, 405);
+      let 몸 = ''; req.setEncoding('utf8');
+      req.on('data', c => { 몸 += c; if (몸.length > 32 * 1024 * 1024) req.destroy(); });
+      req.on('end', () => {
+        try {
+          const j = JSON.parse(몸), 이름 = path.basename(String(j.이름 || '')).replace(/[\\/:*?"<>|]/g, '_');
+          if (!/\.json$/i.test(이름) || typeof j.글 !== 'string' || !j.글.length) return 답({ ok: false, 말: '이름(.json)·내용이 없다' }, 400);
+          const 바깥 = 바깥폴더후보[0] ? path.dirname(바깥폴더후보[0]) : 데이터;
+          const 폴더 = path.join(바깥, '세이브내보내기');
+          fs.mkdirSync(폴더, { recursive: true });
+          const 길 = path.join(폴더, 이름);
+          fs.writeFileSync(길 + '.tmp', j.글, 'utf8'); fs.renameSync(길 + '.tmp', 길);
+          /* 사람이 찾아갈 글 — 안드로이드는 «Android/data/…» 부터 · 아이폰은 파일 앱 «나의 iPhone › 창세기전2 › 세이브내보내기» */
+          const 슬길 = 길.replace(/\\/g, '/');
+          const 보이기 = /\/Android\/data\//.test(슬길) ? ('휴대폰 저장공간 ' + 슬길.slice(슬길.indexOf('Android/data/'))) : ('파일 앱 › 이 앱 폴더 › 세이브내보내기 › ' + 이름);
+          답({ ok: true, 길, 보이기 });
+        } catch (e) { 답({ ok: false, 말: String(e && e.message || e) }, 500); }
+      });
+      return;
+    }
     if (p === '/clear' && req.method === 'POST') { fs.rmSync(올린폴더, { recursive: true, force: true }); return 제이슨(res, { 지움: true }); }
     if (p === '/install' && req.method === 'POST') {
       if (설치중) return 제이슨(res, { 설치중: true });
