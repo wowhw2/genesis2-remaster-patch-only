@@ -136,16 +136,31 @@
     var 판보기 = function (b, 맞춤) { if (키 === 'CHP.EXE') 판 = 맞춤 ? '1.0' : (CRC(b) === 판기준CRC['CHP.EXE'] ? '1.2' : '모름'); };
     return 판목록().then(function (목) {
       var 줄 = 목 && 목.파일 && 목.파일[키];
+      /* 통째 — 1.0 바탕이 없는 1.2 패치 파일(SKY04.MAP · ODS3.FPM): 원본이 1.0 판이고 1.2 와 다를 때만 1.2 내용으로
+       *   (사장님 11-27 「패치를 자동으로 적용해서 1.2 기반으로 적용되어야해. 1.0에 남아있는 버그나 이런것들이 어떻게 작용할지 몰라」) */
+      if (줄 && 줄.통째) {
+        if (bytes.length === 줄.결과크기 && CRC(bytes) === 줄.결과CRC) return bytes;
+        return 판확정().then(function (p) { return p === '1.0' ? 덧입히기(줄, new Uint8Array(0), bytes) : bytes; });
+      }
       if (!줄 || bytes.length !== 줄.바탕크기 || CRC(bytes) !== 줄.바탕CRC) { 판보기(bytes, false); return bytes; }
-      return root.fetch('/' + encodeURIComponent('원본판') + '/1.0/' + 줄.차이.split('/').map(encodeURIComponent).join('/'))
+      return 덧입히기(줄, bytes, bytes, 판보기);
+    });
+  }
+  /* 판을 아직 모르면 CHP.EXE 를 한 번 읽어 정한다(읽으면 원본판맞춤이 판을 적는다) */
+  function 판확정() {
+    if (판 !== null) return Promise.resolve(판);
+    return 읽기('CHP.EXE').then(function () { return 판; }, function () { return 판; });
+  }
+  function 덧입히기(줄, 바탕, 원래, 판보기) {
+    var 키 = String(줄.차이 || '').replace(/\.차이$/, '');
+    return root.fetch('/' + encodeURIComponent('원본판') + '/1.0/' + 줄.차이.split('/').map(encodeURIComponent).join('/'))
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
         .then(function (ab) {
-          var 새 = root.G2G1Diff.합치기(bytes, new Uint8Array(ab));
-          판보기(새, true);
-          if (root.console) console.info('[원본판] ' + 키 + ' — 1.0 원본을 1.2' + (줄.결과출처 === '적용' ? '(+고침)' : '') + ' 로 맞춰 읽는다');
+          var 새 = root.G2G1Diff.합치기(바탕, new Uint8Array(ab));
+          if (판보기) 판보기(새, true);
+          if (root.console) console.info('[원본판] ' + 키 + ' — 1.0 원본을 1.2' + (줄.결과출처 === '적용' ? '(+고침)' : '') + ' 로 맞춰 읽는다' + (줄.통째 ? ' (통째)' : ''));
           return 새;
-        })['catch'](function (e) { if (root.console) console.warn('[원본판] ' + 키 + ' 맞춤 실패 — ' + (e && e.message)); 판보기(bytes, false); return bytes; });
-    });
+        })['catch'](function (e) { if (root.console) console.warn('[원본판] ' + 키 + ' 맞춤 실패 — ' + (e && e.message)); if (판보기) 판보기(원래, false); return 원래; });
   }
 
   function 읽기(name, opts) {
