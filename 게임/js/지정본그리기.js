@@ -11983,6 +11983,15 @@ function 만들기(환경) {
     if (loc.nrm >= 0) { gl.disableVertexAttribArray(loc.nrm); gl.vertexAttrib3f(loc.nrm, 0, 1, 0); }
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 표식판.I);
     gl.drawElements(gl.TRIANGLES, 표식판.수, gl.UNSIGNED_INT, 0);
+    /* [리마스터 가림투시] 정본 506 — 앞의 벽·바위·건물에 가려진 범위 칸(깊이 검사에 진 곳)만 한 번 더 반투명으로 — 가려진 칸도 범위가 보인다
+     *   (사장님 11-27 「실제로 벽이나 사물 뒤에 가려졌을때 가려지는 부분도 하이라이트는 표시되어야하고」 · 북극광 3-3B 출구 통로가 앞 동굴 벽 뒤로 접혀 안 보였다)
+     *   보이는 칸은 위 그리기 그대로(GREATER 라 겹쳐 안 그린다) · 리마스터3D.js 가 설정 «가림투시» 로 window.__가림투시 를 세운다 */
+    if (window.__가림투시) {
+      gl.depthFunc(gl.GREATER);
+      gl.enable(gl.BLEND); gl.blendColor(0, 0, 0, 0.5); gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);
+      gl.drawElements(gl.TRIANGLES, 표식판.수, gl.UNSIGNED_INT, 0);
+      gl.disable(gl.BLEND); gl.depthFunc(gl.LEQUAL);
+    }
     if (원경바꿈) { gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, 원경tex); gl.activeTexture(gl.TEXTURE0); if (loc.BgOn) gl.uniform1f(loc.BgOn, 0); }
     gl.disable(gl.POLYGON_OFFSET_FILL); gl.depthMask(true); gl.depthFunc(gl.LESS);
     return 칸들.length;
