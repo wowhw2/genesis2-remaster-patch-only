@@ -2032,6 +2032,15 @@ Hud.prototype.turnGauge = function (ctx, turn, period) {
     this.blit(ctx, 'FRAME.SYB', TURN.left.frame,  TURN.left.x  + TURN.left.step  * k, TURN.left.y  + (this.cy | 0), false);
     this.blit(ctx, 'FRAME.SYB', TURN.right.frame, TURN.right.x + TURN.right.step * k, TURN.right.y + (this.cy | 0), false);
   }
+  /* ★ 정본 508 — 턴 게이지 **아래**도 화면 끝까지 검게 덮는다 (사장님 11-28 「아직도 화면 하단 턴바 아래 빈공간에 맵이 보여.」)
+   *   원본 화면은 y=200 에서 끝난다(바 196~199 · 그 아래는 화면이 없다). 우리는 논리 높이가
+   *   `ceil(h/s)` 라 홀수로 남으면(4:3 · 1920×1080 → LH 201 · cy 0) 바 아래 한 줄이 비어 맵이 비쳤다.
+   *   같은 자리 게이지 그림(16·17)이 200 아래로 삐친 것도 원본처럼 잘린다. 끄개 `__턴바아래덮개끔`. */
+  var 아래 = BY + 4, 끝 = (this.logicalH || VIEW.h) - (this.cy | 0) + 1;
+  if (!root.__턴바아래덮개끔 && 끝 > 아래) {
+    ctx.fillStyle = this.assets.color(0);
+    ctx.fillRect(-(this.cx | 0), 아래, (this.logicalW || VIEW.w), 끝 - 아래);
+  }
   return this;
 };
 
