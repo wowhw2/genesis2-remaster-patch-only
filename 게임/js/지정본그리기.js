@@ -5516,7 +5516,9 @@ function 만들기(환경) {
       if (띠.length) { 지정._기둥띠 = 띠; 경계떼기목록 = [...판들.values()]; } }
     지정._오높 = 오높; 섬합();
     /* PR 감옥문(오브젝트층 축대 띠 · 그 위 2줄) 밑 지면 — 지형 그림의 문 화소를 띠 바로 아래 줄 바닥 타일로 바꾼다 · 판은 원래 그림 그대로 (사장님 10-25 「감옥문 밑으로 문 이미지가 보여. 지면 타일로 바꿔줘.」) */
-    if (/^PR(ISON)?0[0-9]$/.test(규칙맵) && (오.축대구간 || []).length) { const 지d = new Uint8ClampedArray(d); (오.축대구간 || []).forEach(t => { const 원 = Math.min(지정.H - 1, t.y1 + 1); for (let cy = Math.max(0, t.y0 - 2); cy <= t.y1; cy++) for (let b = 0; b < TH; b++) for (let a = 0; a < TW; a++) { const P = ((위여백 + cy*TH + b)*W + t.x*TW + a)*4, Q = ((위여백 + 원*TH + b)*W + t.x*TW + a)*4; 지d[P] = d[Q]; 지d[P+1] = d[Q+1]; 지d[P+2] = d[Q+2]; 지d[P+3] = 255; } }); const c = document.createElement('canvas'); c.width = W; c.height = H; c.getContext('2d').putImageData(new ImageData(지d, W, H), 0, 0); 지형tex = 텍스처(c); }
+    /* ★ 정본 482 — PRISON01 가운데 남쪽 감옥문 통로(21~22열 · 띠 37~40)는 바로 아래 41줄이 «벽돌 벽면» 그림이라, 그 타일로 바꾼 통로 바닥(35~40줄)이 벽처럼 보여 기울기가 낮으면 캐릭터가 벽을 타고 오르는 듯했다
+     *   (사장님 11-27 「남쪽 중앙 감옥문을 지날때(설정상 문 아래로 지날떄) 위로 올라간것처럼 보이는것도 함꼐 해결해」) ⇒ 그 통로만 아치 안쪽 어두운 통로 타일(39줄)로 · 판(윗돌·돌테)은 원래 그림 그대로 */
+    if (/^PR(ISON)?0[0-9]$/.test(규칙맵) && (오.축대구간 || []).length) { const 지d = new Uint8ClampedArray(d); (오.축대구간 || []).forEach(t => { const 원 = Math.min(지정.H - 1, t.y1 + 1), 통로 = 규칙맵 === 'PRISON01' && (t.x === 21 || t.x === 22) && t.y0 === 37; for (let cy = Math.max(0, t.y0 - 2); cy <= t.y1; cy++) for (let b = 0; b < TH; b++) for (let a = 0; a < TW; a++) { const P = ((위여백 + cy*TH + b)*W + t.x*TW + a)*4, Q = ((위여백 + (통로 ? 39 : 원)*TH + b)*W + t.x*TW + a)*4; 지d[P] = d[Q]; 지d[P+1] = d[Q+1]; 지d[P+2] = d[Q+2]; 지d[P+3] = 255; } }); const c = document.createElement('canvas'); c.width = W; c.height = H; c.getContext('2d').putImageData(new ImageData(지d, W, H), 0, 0); 지형tex = 텍스처(c); }
     /* SHP — 바다 칸 위로 띄운 오브젝트(노·난간) 화소는 바닥 그림에서 지우고 같은 줄 가까운 빈 바다 칸 그림으로 · 노가 바다 바닥에도 그려져 위아래 두 벌 보였다 (사장님 10-27 「노는 수면에 그려진건 없어야해. 지금은 수면에도 있고 위에도 있어」) */
     if (/^SHP[0-9][0-9]$/.test(규칙맵)) { const W2 = 지정.W, H2 = 지정.H; let lo = Infinity; for (let k = 0; k < W2*H2; k++) if (!(지정._여백 && 지정._여백[k])) lo = Math.min(lo, 지정.지형높이[k]);
       const 바다 = (x, y) => x >= 0 && x < W2 && !(지정._여백 && 지정._여백[y*W2 + x]) && Math.abs(지정.지형높이[y*W2 + x] - lo) < 1e-3, 지d = new Uint8ClampedArray(d); let n = 0;
@@ -11568,13 +11570,38 @@ function 만들기(환경) {
       const X = u.발.x - 반W, Z = u.발.y + Z0, h = u.발.h || 0;
       let v;
       if (u.발.눕) { const y = h + 1; v = [X - 넓, y, Z - 넓, X + 넓, y, Z - 넓, X + 넓, y, Z + 넓, X - 넓, y, Z - 넓, X + 넓, y, Z + 넓, X - 넓, y, Z + 넓]; }
+      else if (u.발.기울 > 0) {
+        /* ★ 정본 482 — 구조물(감옥문·감옥벽 등 · 리마스터3D 구조세우기)은 벽 앞면 비탈에 «기대» 선다: 높이(맵 y) = 면높 + 기울 × (F − y) · 남쪽을 본다(카메라 회전과 무관)
+         *   곧게 선 판(발줄)으로 가리면 문 윗부분(실제로는 북쪽 안쪽)과 카메라 사이의 감방 옆벽·앞벽을 «문보다 뒤»로 봐, 회전하면 옆벽 너머로 창살이 비쳤다
+         *   (사장님 11-27 「감옥맵 가림관계 이상한거 처리했어? 감옥벽위에 비치는 것…」·「특정 각도에서 비쳐」 · 측정 창 9-6 기울기 60 회전 ±30)
+         *   ⇒ 그 비탈면 그대로 판을 세운다(발 앞 1.5px 에서 북쪽 600px 까지) + 발 앞 끝에서 40px 아래로 치마 · 문이 기댄 벽면과 같은 면이면 깊이 다툼(빗금)이 나 3px 띄운다 */
+        const 기 = u.발.기울, h0 = (u.발.면높 != null ? u.발.면높 : h) + 3, zf = Z + 1.5, hf = h0 - 기 * 1.5, zb = Z - 600, hb = h0 + 기 * 600, xa = X - 넓, xb = X + 넓;
+        v = [xa, hf, zf, xb, hf, zf, xb, hb, zb, xa, hf, zf, xb, hb, zb, xa, hb, zb,
+             xa, hf - 40, zf, xb, hf - 40, zf, xb, hf, zf, xa, hf - 40, zf, xb, hf, zf, xa, hf, zf];
+      }
       else {
         const 앞 = u.발.앞 || 판앞, cx = X + nx * 앞, cz = Z + ny * 앞, ax = cx - tx * 넓, az = cz - ty * 넓, bx = cx + tx * 넓, bz = cz + ty * 넓, 아 = h - 40, 위 = h + 넓;
         v = [ax, 아, az, bx, 아, bz, bx, 위, bz, ax, 아, az, bx, 위, bz, ax, 위, az];
       }
+      /* ★ 정본 482 — 꼴(구조물 그림 네 귀를 화면에 투영한 평행사변형 · 리마스터3D 구조꼴)이 있으면 판을 그 안에서만 세운다
+       *   네모 상자 그대로면 회전한 문의 빈 모서리에서도 «가까운 판»이 이겨, 그 뒤 유닛 앞 벽을 못 그려 창살이 벽 너머로 비쳤다(9-6 기울기 60 회전 ±30)
+       *   스텐실 0x20 비트로 꼴 안을 표시 → 판은 그 비트가 있는 곳만(아래 넷 비트에 2) → 꼴 안 비트를 지운다 */
+      const 꼴 = Array.isArray(u.발.꼴) && u.발.꼴.length === 4 && u.발.꼴.every(q => q && Number.isFinite(q[0]) && Number.isFinite(q[1])) ? u.발.꼴 : null;
+      const 꼴칠 = (op) => {
+        const n = q => [q[0] / cv.width * 2 - 1, 1 - q[1] / cv.height * 2], a = n(꼴[0]), b2 = n(꼴[1]), c = n(꼴[2]), d = n(꼴[3]);
+        gl.useProgram(사각prog); gl.disableVertexAttribArray(판loc.p); gl.bindBuffer(gl.ARRAY_BUFFER, 사각버프);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([a[0], a[1], b2[0], b2[1], c[0], c[1], a[0], a[1], c[0], c[1], d[0], d[1]]), gl.DYNAMIC_DRAW);
+        gl.enableVertexAttribArray(사각loc.a); gl.vertexAttribPointer(사각loc.a, 2, gl.FLOAT, false, 0, 0); gl.uniform1f(사각loc.z, 0);
+        gl.disable(gl.DEPTH_TEST); gl.stencilMask(0x20); gl.stencilFunc(gl.ALWAYS, 0x20, 0xFF); gl.stencilOp(gl.KEEP, gl.KEEP, op);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.disableVertexAttribArray(사각loc.a); gl.enable(gl.DEPTH_TEST);
+        gl.useProgram(판prog); gl.bindBuffer(gl.ARRAY_BUFFER, 판버프); gl.enableVertexAttribArray(판loc.p);
+      };
+      if (꼴 && 사각prog) { 꼴칠(gl.REPLACE); gl.stencilMask(0x0F); gl.stencilFunc(gl.LEQUAL, 0x22, 0x20); gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE); }
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(v), gl.DYNAMIC_DRAW);
       gl.vertexAttribPointer(판loc.p, 3, gl.FLOAT, false, 0, 0);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      gl.drawArrays(gl.TRIANGLES, 0, v.length / 3);
+      if (꼴 && 사각prog) { 꼴칠(gl.ZERO); gl.stencilMask(0xFF); gl.stencilFunc(gl.GEQUAL, 2, 0xFF); gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE); }
     }
     gl.disableVertexAttribArray(판loc.p);
     gl.disable(gl.SCISSOR_TEST);

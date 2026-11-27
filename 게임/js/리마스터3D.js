@@ -474,7 +474,7 @@
        *     (11-25 측정 2-4A 뮐러 16,30: 4px 마다 +4.2 비탈이 24px 앞에서 150 평지 · 기울기 60 에서 몸이 거의 다 묻힘 — 원작 화면은 다 보임)
        *   ⇒ 그림자(정본 401)와 같은 뜻: 걸어 오를 수 있는 비탈·꼭대기 땅은 안 덮고, 꼭대기보다 솟은 벽·턱만 덮는다 */
       if (!비행 && 이음 && 닻.오끝 == null) { 사각.push({ l: r.left - 호.left, t: r.top - 호.top, r: r.right - 호.left, b: r.bottom - 호.top, 줄: 줄, 발: { x: 닻.x, y: 닻.가림F != null ? 닻.가림F : 닻.F, h: 비탈꼭대기(s, u.x | 0, u.y | 0), 눕: true } }); }
-      else if (!비행) 사각.push({ l: r.left - 호.left, t: r.top - 호.top, r: r.right - 호.left, b: r.bottom - 호.top, 줄: 줄, 발: { x: 닻.x, y: 닻.가림F != null ? 닻.가림F : 닻.F, h: 닻.높, 오y:닻.오끝, 앞: 닻.오끝 != null ? Math.max(0.01, 남끝 - 0.01 - (닻.가림F != null ? 닻.가림F : 닻.F)) : Math.max(0.5, Math.min(8 + 이음 * 16, 남끝 - 0.5 - (닻.가림F != null ? 닻.가림F : 닻.F))) } });   /* 앞 — 판을 카메라 쪽으로 8px 미는데 유닛 칸 남쪽 끝은 넘지 않게: 넘으면 바로 남쪽 바위 칸의 가장자리 테두리(칸 위 0~3px)가 판 뒤로 잡혀 머리를 못 덮었다 (사장님 10-27 「아직도 머리가 위로 튀어나와」 · 1-7 YOU01 22~26열 13줄 · 발 219 + 8 = 227 > 바위 칸 224) */
+      else if (!비행) 사각.push({ l: r.left - 호.left, t: r.top - 호.top, r: r.right - 호.left, b: r.bottom - 호.top, 줄: 줄, 발: { x: 닻.x, y: 닻.가림F != null ? 닻.가림F : 닻.F, h: 닻.높, 오y:닻.오끝, 기울: box._3d구조면 ? box._3d구조면.기울 : undefined, 면높: box._3d구조면 ? box._3d구조면.발높 : undefined, 꼴: box._3d구조면 ? 구조꼴(R, s, box, 닻, box._3d구조면) : undefined, 앞: 닻.오끝 != null ? Math.max(0.01, 남끝 - 0.01 - (닻.가림F != null ? 닻.가림F : 닻.F)) : Math.max(0.5, Math.min(8 + 이음 * 16, 남끝 - 0.5 - (닻.가림F != null ? 닻.가림F : 닻.F))) } });   /* 앞 — 판을 카메라 쪽으로 8px 미는데 유닛 칸 남쪽 끝은 넘지 않게: 넘으면 바로 남쪽 바위 칸의 가장자리 테두리(칸 위 0~3px)가 판 뒤로 잡혀 머리를 못 덮었다 (사장님 10-27 「아직도 머리가 위로 튀어나와」 · 1-7 YOU01 22~26열 13줄 · 발 219 + 8 = 227 > 바위 칸 224) */
       /* ★ 정본 401 — 발밑 그림자는 «선 땅 높이에 눕힌 판»으로 따로 가린다 (사장님 11-22 「1-10 전투인데 비룡 그림자 잘리는거 심각하게 어색하고.」)
        *   ☠ 몸과 같은 세운 판(발줄)으로 가리면 발 아래로 내려간 그림자는 «땅 속»이 되어 앞 칸 맨땅이 덮었다 — 비룡처럼 그림자가 몸에서 멀리 아래인
        *     그림은 가는 띠 몇 줄만 남고 칸 경계에서 곧게 잘렸다(1-10 발키리 실측). 원작에서 그림자는 바닥에 깔리는 그림이다(0x1309D · 맵 그리기 몫)
@@ -546,6 +546,22 @@
    *   대포 몸 183~207줄 = 성벽 앞면 166~224 안) ⇒ 그림 n 줄 위 = 맵 줄 F−n · 높이 = 그 면의 높이 (같은 면에 눕혀 기댄다 · 자리·크기는 원작 그대로)
    *   면 = THUND 는 성벽선(지정본그리기 THUND면 의 성벽 앞면 식 · 무너진 틈은 옆 성벽 기준 윗끝) · 다른 맵은 몸이 걸친 줄의 지형 높이를 곧은 면으로 맞춘다
    *   반환 { 기울: 한 줄 위로 갈 때 오르는 높이(px) · 발높: 발줄 F 의 면 높이 } · 기울지 않은 자리(평지)는 null → 다른 캐릭터처럼 곧게 */
+  /* ★ 정본 482 — 구조물 그림(벽 앞면에 기대 선 판)의 네 귀를 화면(host 좌표)에 투영한다 — 회전하면 평행사변형이라 네모 상자는 빈 모서리까지 품었다
+   *   가림판은 겹친 자리에서 «더 가까운 판»으로 가림을 정하므로, 남쪽 문(27)의 빈 모서리가 북쪽 문(25) 앞 남쪽 벽을 못 그리게 해 창살이 벽 너머로 비쳤다(9-6 기울기 60 회전 ±30)
+   *   세계 점: x = l + px · y = t + py · 높이 = 발높 + 기울 × (F − y)  (구조세우기 의 변환 그대로 · py 는 잘린 윗단(자름)부터 상자 높이까지) */
+  function 구조꼴(R, s, box, 닻, 면) {
+    try {
+      var P = root.G2Projection, c = R.cam, v = (!s.apply중 && s.vcam3d) || R._vcam || {};
+      var 카 = { tilt: c.tilt, rot: c.rot, dist: c.dist, fov: c.fov, zoom: c.zoom, cx: c.cx, cy: c.cy, vcx: v.cx != null ? v.cx : c.cx, vcy: v.cy != null ? v.cy : c.cy };
+      var 세계 = { mapW: R.mapW, mapH: R.mapH, TW: 24, TH: 16 }, 호 = R.호스트크기 ? R.호스트크기() : { w: R.host.clientWidth, h: R.host.clientHeight };
+      var 뷰 = { 출력w: 호.w, 출력h: 호.h, dpr: root.devicePixelRatio || 1 }, 옵 = { 흔들: R.shake || { x: 0, y: 0 } };
+      var o = 원점(box), Fc = 닻.F - R.mapH / 2, 위 = box._3d자름 > 0 ? box._3d자름 : 0;
+      return [[0, 위], [o.w, 위], [o.w, o.h], [0, o.h]].map(function (q) {
+        var X = o.l + q[0], Y = o.t + q[1], p = P.투영(카, 세계, 뷰, { x: X, y: Y, z: 면.발높 + 면.기울 * (Fc - Y) }, 옵);
+        return [p.sx, p.sy];
+      });
+    } catch (e) { return undefined; }
+  }
   function 구조면(R, s, box, 닻) {
     var 지 = s.장면.지정 && s.장면.지정(); if (!지) return null;
     var o = 원점(box), 몸 = 몸배치(box), TW = 지.TW || 24, X = 닻.x, cx = Math.floor(X / TW), tx = Math.max(0, Math.min(TW - 1, Math.floor(X - cx * TW)));
