@@ -331,6 +331,8 @@ function 패치살피기() {
     if (!r.있음) return;
     $('패치말').textContent = '새 패치 ' + r.판 + ' 가 있습니다 · ' + 크기글(r.크기) + (r.지금판 ? ' (지금 ' + r.지금판 + ')' : '');
     $('패치받기').hidden = false; $('패치받기').disabled = false; $('패치줄').hidden = false;
+    /* 정본 503 — 누르지 않아도 저절로 받는다 · 데스크톱 설치.html 과 같은 동작 (사장님 11-27 고르심 «저절로 받기» · 「모바일도 동일하게 해줘」) · 실패하면 단추로 다시 받는다 */
+    if (!$('바로시작').disabled) $('패치받기').click();
   }).catch(function () { clearTimeout(타); });   /* 인터넷이 안 되면 조용히 */
 }
 $('패치받기').addEventListener('click', function () {
