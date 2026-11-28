@@ -362,6 +362,7 @@
     try { 화면판맞추기(R, s); s.화면판오류 = null; } catch (e화면판) { s.화면판오류 = String(e화면판 && e화면판.stack || e화면판).slice(0, 300); }
     잼('3D:화면판');
     커서띄우기(R, s);
+    try { s.커서표 = 커서표(R); } catch (e커표) { s.커서표 = null; }   /* 정본 513 — selectBox 감싸기가 «그대로면 건너뛰기»에 쓴다 */
     잼('3D:커서');
     /* 가림판보다 아래 층(월드·월드 아래)의 맵 위 연출도 유닛처럼 — 앞 줄 건물·나무에 가린다 (맨 위 연출층은 가림판 위라 그대로) */
     연출자리(R, s).forEach(function (q) { s.사각.push(q); });
@@ -1187,6 +1188,15 @@
       }
     }
   }
+  /* 정본 513 — 커서 상자들의 지금 모습(스타일만 읽는다 · 배치 셈 없음) — 같으면 다시 띄울 일이 없다 */
+  function 커서표(R) {
+    var a = [];
+    (R.boxEls || []).forEach(function (b) { if (!b) { a.push('-'); return; } var t = b.style; a.push(t.display + '|' + t.left + '|' + t.top + '|' + t.width + '|' + t.height + '|' + t.transform + '|' + b._ground + '|' + b._left); });
+    var 대 = R.boxTarget, e = 대 && 대.id != null && R.unitEls && R.unitEls[대.id], 닻 = e && e._3d닻;
+    a.push(대 && 대.id != null ? 대.id : '', 닻 ? 닻.x + ',' + 닻.F + ',' + 닻.높 : '', e ? e.style.display : '');
+    var f = R.facingBoxEl; if (f) a.push(f.style.display + '|' + f.style.left + '|' + f.style.top + '|' + f.style.transform);
+    return a.join(';');
+  }
   function 커서내리기(R) {
     (R.boxEls || []).forEach(function (b) {
       if (!b) return;
@@ -1748,7 +1758,9 @@
     표.원선택상자 = R.selectBox;
     R.selectBox = function () {
       var r = 표.원선택상자.apply(this, arguments);
-      if (표.준비됨 && R._리마스터3D === 표 && R.host.classList.contains('g2-3d맵')) { try { 커서띄우기(R, 표); } catch (e) {} }
+      /* 정본 513 — 상자 자리·높이·대상이 지난번 띄운 뒤와 같으면 건너뛴다 — 대사 중 keepFocus 가 장마다 같은 화자로 selectBox 를 불러
+       *   그때마다 가림자리(getBoundingClientRect)가 배치를 통째로 다시 셌다(측정 창 13-6 3D 45 · CPU×6 · 적 차례 25초: 321ms) · 바뀌었으면(selectBox 가 높이를 0 으로 되돌림 등) 예전처럼 바로 띄운다 · 끄개 __커서띄우기늘 */
+      if (표.준비됨 && R._리마스터3D === 표 && R.host.classList.contains('g2-3d맵')) { try { if (root.__커서띄우기늘 || 커서표(R) !== 표.커서표) { 커서띄우기(R, 표); 표.커서표 = 커서표(R); } } catch (e) {} }
       return r;
     };
     /* 정본 392 — 방향 화살표도 같다: facingGuide 가 방향을 바꿀 때마다 높이를 transform none(땅 0)으로 되돌리고 커서띄우기는 다음 apply 에서야 올려

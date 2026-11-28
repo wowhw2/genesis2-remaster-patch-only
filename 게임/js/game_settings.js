@@ -939,9 +939,28 @@ function 돌무늬받기(바이트, 한가) {
   if (_돌무늬약속) return _돌무늬약속;
   var N = root.G2Native;
   _돌무늬약속 = Promise.all([바이트('STATUS.PCX'), 바이트('EQUMENT.PCX')]).then(function (b) {
-    var srcs = b.map(function (x) { return N.decodePcx(x); });
-    if (!(srcs[0] && srcs[1])) return null;
-    return 돌무늬나눠짓기(srcs, 480, 200, 12345).then(function (cv) { _돌무늬틀 = cv; return cv; });
+    /* ★ 정본 513 — 지은 무늬를 이 기기에 담아 두고 다음 실행부터 꺼내 쓴다 (결과는 원본 두 그림·씨앗 12345 로 늘 같다)
+     *   측정 창 1-2 전투 열기 CPU 기록: 나눠 짓기 «조각» 597ms — 켤 때마다 같은 그림을 다시 지으며 한가한 틈마다 최대 40ms 씩 화면을 잡았다
+     *   열쇠 = 두 그림 바이트 길이·합 (원본 판이 달라 그림이 다르면 새로 짓는다) · 못 담으면(저장 공간·사생활 창) 예전대로 짓는다 · 끄개 __돌무늬담기끔 */
+    var 합 = function (u) { var h = 0; for (var i = 0; i < u.length; i += 7) h = (h * 31 + u[i]) >>> 0; return u.length + '.' + h; };
+    var 열쇠 = 'g2.돌무늬1|' + 합(b[0]) + '|' + 합(b[1]), 담긴 = null;
+    try { if (!root.__돌무늬담기끔) 담긴 = root.localStorage.getItem(열쇠); } catch (e담) { }
+    var 짓기 = function () {
+      var srcs = b.map(function (x) { return N.decodePcx(x); });
+      if (!(srcs[0] && srcs[1])) return null;
+      return 돌무늬나눠짓기(srcs, 480, 200, 12345).then(function (cv) {
+        _돌무늬틀 = cv;
+        try { if (!root.__돌무늬담기끔) { Object.keys(root.localStorage).forEach(function (k) { if (k.indexOf('g2.돌무늬1|') === 0 && k !== 열쇠) root.localStorage.removeItem(k); }); root.localStorage.setItem(열쇠, cv.toDataURL('image/png')); } } catch (e쓰) { }
+        return cv;
+      });
+    };
+    if (!담긴) return 짓기();
+    return new Promise(function (다) {
+      var im = new Image();
+      im.onload = function () { var cv = document.createElement('canvas'); cv.width = 480; cv.height = 200; cv.getContext('2d').drawImage(im, 0, 0); _돌무늬틀 = cv; 다(cv); };
+      im.onerror = function () { try { root.localStorage.removeItem(열쇠); } catch (e지) { } 다(짓기()); };
+      im.src = 담긴;
+    });
   })['catch'](function () { _돌무늬약속 = null; return null; });
   return _돌무늬약속;
 }

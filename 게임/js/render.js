@@ -12936,7 +12936,11 @@ Renderer.prototype._카메라한칸 = function () {
    *   ☠ 스크롤 동안 게임 시간이 멈춰(G2연출싣기) 보간 비율이 굳어, 화면이 걸음의 일부만 따라오다 마지막 걸음에 나머지를 한꺼번에 뛰었다
    *   (실측 2-4A 연 뒤 시전자 비추기: 카메라 중심 360→368→376→384 인데 화면 709→681→673→585 · 사장님 「천천히 이동하다가 갑자기 순간이동」·「시전완료후 픽셀이 이동」) */
   if (t.raf) this._pcam = { cx: this.cam.cx, cy: this.cam.cy };
-  this.apply();
+  /* 정본 513 — 전투 프레임 루프가 돌고 있으면(스크롤 중엔 그 루프가 매 장 apply 한다 · battle_main 한프레임 «카메라이동중인가») 중간 걸음은 예약 표시만 남긴다 — camTo(정본 400)와 같은 방식
+   *   ☠ 여기서도 apply 하면 한 장에 두 번 통째로 반영했다(측정 창 13-6 2.5D · CPU×6 · 라운드 넘기기 12초: 533장 중 299장이 장당 2번 — 스크롤 rAF 324번 + 주 루프 336번 · 한 장 300~400ms)
+   *   마지막 걸음은 바로 그린다(기다리는 대사창이 곧 깨어난다) · 끄개 window.__카메라한칸매번 */
+  if (this._camScrolling && this.lerpOn && this._프레임루프때 && !root.__카메라한칸매번 && root.performance && performance.now() - this._프레임루프때 < 100) this._apply예약 = true;
+  else this.apply();
   return this._camScrolling;
 };
 
