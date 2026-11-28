@@ -8114,12 +8114,18 @@ window.G2_셸이몬다 = true;
               if (_원근소스키 !== 배경 || _원근소스배율 !== _N) {
                 var lw = (배경.논리w || 배경.width), lh = (배경.논리h || 배경.height);
                 var sw = lw * _N, sh = lh * _N;
+                /* 정본 515 — 배경 캔버스가 이미 그 크기면(스케일러 N배로 구운 CPU 캔버스) 새 캔버스에 통째로 다시 그리지 않고 바로 읽는다
+                 *   신고 성능기록(월드 열 때 첫 장 셸 28~214ms · PC·휴대폰 여럿) · 측정 창 3840×2800(xbrz4n): 옛 69~135ms → 바로 6~8ms · 읽은 값 같음 · 끄개 window.__원근소스다시그림 */
+                if (!window.__원근소스다시그림 && 배경.width === sw && 배경.height === sh && 배경.getContext) {
+                  _원근소스 = 배경.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, sw, sh);
+                } else {
                 var tc = document.createElement('canvas');
                 tc.width = sw; tc.height = sh;
                 var tx = tc.getContext('2d');
                 tx.imageSmoothingEnabled = false;          /* ★ 도트 보존 (줄이거나 늘릴 때) */
                 tx.drawImage(배경, 0, 0, 배경.width, 배경.height, 0, 0, sw, sh);
                 _원근소스 = tx.getImageData(0, 0, sw, sh);
+                }
                 _원근소스키 = 배경; _원근소스배율 = _N;
                 console.info('[월드] 배경 원근 소스 ' + sw + '×' + sh +
                              (_N > 1 ? '  (스케일러 ' + _N + '배 그대로)' : '') +
